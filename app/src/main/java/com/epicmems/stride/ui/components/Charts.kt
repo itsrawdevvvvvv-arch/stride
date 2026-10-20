@@ -127,38 +127,45 @@ fun RouteCanvas(
     color: Color = Lime,
     strokeWidth: Dp = 3.dp
 ) {
+    // Normalising is O(n); remember it so unrelated recompositions don't repeat the work.
+    val normalised = remember(points) { Geo.normalise(points) }
+
     Canvas(modifier) {
-        if (points.size < 2) return@Canvas
-        val normalised = Geo.normalise(points)
         if (normalised.isEmpty()) return@Canvas
 
         val pad = strokeWidth.toPx() * 2f
         val w = (size.width - pad * 2f).coerceAtLeast(1f)
         val h = (size.height - pad * 2f).coerceAtLeast(1f)
 
-        val path = Path()
-        normalised.forEachIndexed { index, point ->
-            val px = pad + point.first * w
-            val py = pad + point.second * h
-            if (index == 0) path.moveTo(px, py) else path.lineTo(px, py)
+        if (normalised.size >= 2) {
+            val path = Path()
+            normalised.forEachIndexed { index, point ->
+                val px = pad + point.first * w
+                val py = pad + point.second * h
+                if (index == 0) path.moveTo(px, py) else path.lineTo(px, py)
+            }
+            drawPath(
+                path = path,
+                color = color,
+                style = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+            )
         }
-        drawPath(
-            path = path,
-            color = color,
-            style = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-        )
 
+        // The start marker is drawn as soon as there is a single fix, so the user sees the
+        // route begin immediately rather than an empty box.
         val start = normalised.first()
-        val end = normalised.last()
         drawCircle(
             color = color,
-            radius = strokeWidth.toPx() * 1.7f,
+            radius = strokeWidth.toPx() * 1.8f,
             center = Offset(pad + start.first * w, pad + start.second * h)
         )
-        drawCircle(
-            color = Color.White,
-            radius = strokeWidth.toPx() * 0.9f,
-            center = Offset(pad + end.first * w, pad + end.second * h)
-        )
+        if (normalised.size >= 2) {
+            val end = normalised.last()
+            drawCircle(
+                color = Color.White,
+                radius = strokeWidth.toPx() * 0.9f,
+                center = Offset(pad + end.first * w, pad + end.second * h)
+            )
+        }
     }
 }

@@ -1,12 +1,35 @@
 package com.epicmems.stride.domain
 
+import androidx.compose.runtime.Immutable
 import com.epicmems.stride.util.Dates
 import java.time.LocalDate
 
 /** A point on a recorded route. */
+@Immutable
 data class LatLng(val lat: Double, val lng: Double)
 
-/** One day of step data, ready for the UI. */
+/** What the route recorder is currently doing — surfaced in the UI so failures are visible. */
+enum class RecordingStatus {
+    IDLE,
+    /** Registered with a provider, no fix yet. */
+    ACQUIRING,
+    /** Receiving fixes and drawing. */
+    TRACKING,
+    /** Location services are switched off on the device. */
+    LOCATION_OFF,
+    /** The app was not granted location permission. */
+    PERMISSION_MISSING,
+    /** No usable location provider on this device. */
+    UNAVAILABLE
+}
+
+/**
+ * One day of step data, ready for the UI.
+ *
+ * Marked [Immutable] so Compose can skip recomposing composables that receive it when the
+ * instance is equal — this is what keeps the screen calm while live data streams in.
+ */
+@Immutable
 data class DayStat(
     val date: LocalDate,
     val steps: Int,
@@ -24,6 +47,7 @@ data class DayStat(
 }
 
 /** Summary of a recorded GPS route. */
+@Immutable
 data class RouteSummary(
     val id: Long,
     val startTime: Long,
@@ -34,14 +58,17 @@ data class RouteSummary(
 )
 
 /** Live state of the route recorder, exposed to the UI. */
+@Immutable
 data class RecordingState(
     val recording: Boolean = false,
     val distanceMeters: Double = 0.0,
     val durationMillis: Long = 0L,
-    val points: List<LatLng> = emptyList()
+    val points: List<LatLng> = emptyList(),
+    val status: RecordingStatus = RecordingStatus.IDLE
 )
 
 /** Everything the screens render. */
+@Immutable
 data class StrideUiState(
     val loading: Boolean = true,
     val today: LocalDate = Dates.today(),

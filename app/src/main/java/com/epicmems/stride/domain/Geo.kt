@@ -52,6 +52,8 @@ object Geo {
      */
     fun normalise(points: List<LatLng>): List<Pair<Float, Float>> {
         if (points.isEmpty()) return emptyList()
+        // A single point has no shape to fit — park it in the middle.
+        if (points.size == 1) return listOf(0.5f to 0.5f)
         val b = bounds(points) ?: return emptyList()
         val minLat = b[0]; val minLng = b[1]; val maxLat = b[2]; val maxLng = b[3]
 

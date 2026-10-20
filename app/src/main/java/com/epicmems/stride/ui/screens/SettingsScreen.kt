@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import com.epicmems.stride.data.ExportWriter
 import com.epicmems.stride.domain.StrideUiState
 import com.epicmems.stride.ui.StrideViewModel
@@ -83,16 +84,19 @@ fun SettingsScreen(state: StrideUiState, viewModel: StrideViewModel) {
         DarkCard(modifier = Modifier.fillMaxWidth()) {
             Text("Daily goal", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(6.dp))
+
+            // The readout follows the thumb *live* while dragging; the value is only persisted
+            // when the drag ends, so we don't hammer DataStore on every frame.
+            var localGoal by remember(state.goal) { mutableFloatStateOf(state.goal.toFloat()) }
             Text(
-                text = Format.steps(state.goal),
+                text = Format.steps(localGoal.roundToInt()),
                 color = Lime,
                 style = MaterialTheme.typography.displayMedium
             )
-            var localGoal by remember(state.goal) { mutableFloatStateOf(state.goal.toFloat()) }
             Slider(
                 value = localGoal,
                 onValueChange = { localGoal = it },
-                onValueChangeFinished = { viewModel.setGoal(localGoal.toInt()) },
+                onValueChangeFinished = { viewModel.setGoal(localGoal.roundToInt()) },
                 valueRange = 1_000f..30_000f,
                 steps = 28,
                 colors = androidx.compose.material3.SliderDefaults.colors(

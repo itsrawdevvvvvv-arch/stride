@@ -1,8 +1,5 @@
 package com.epicmems.stride.ui.screens
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,24 +25,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.epicmems.stride.domain.RecordingStatus
 import com.epicmems.stride.domain.StrideUiState
 import com.epicmems.stride.ui.components.AnimatedDistance
 import com.epicmems.stride.ui.components.AnimatedSteps
 import com.epicmems.stride.ui.components.DarkCard
 import com.epicmems.stride.ui.components.GhostButton
-import com.epicmems.stride.ui.components.Motion
 import com.epicmems.stride.ui.components.PastelCard
 import com.epicmems.stride.ui.components.PrimaryButton
 import com.epicmems.stride.ui.components.ProgressPill
@@ -54,6 +46,8 @@ import com.epicmems.stride.ui.components.RouteCanvas
 import com.epicmems.stride.ui.components.StatChip
 import com.epicmems.stride.ui.components.StepRing
 import com.epicmems.stride.ui.components.WeekBars
+import com.epicmems.stride.ui.components.recordingStatusHint
+import com.epicmems.stride.ui.components.recordingStatusLabel
 import com.epicmems.stride.ui.theme.Lime
 import com.epicmems.stride.ui.theme.OnPastel
 import com.epicmems.stride.ui.theme.Pink
@@ -71,29 +65,10 @@ fun TodayScreen(
 ) {
     val progress = if (state.goal <= 0) 0f else state.todaySteps.toFloat() / state.goal
 
-    // Screen entrance: fade + a short rise, driven from the draw phase so it costs no
-    // recomposition while it plays.
-    var appeared by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { appeared = true }
-    val enterAlpha = animateFloatAsState(
-        targetValue = if (appeared) 1f else 0f,
-        animationSpec = tween(Motion.BASE, easing = FastOutSlowInEasing),
-        label = "enterAlpha"
-    )
-    val enterOffsetY = animateFloatAsState(
-        targetValue = if (appeared) 0f else 26f,
-        animationSpec = tween(Motion.BASE, easing = FastOutSlowInEasing),
-        label = "enterOffset"
-    )
-
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .graphicsLayer {
-                alpha = enterAlpha.value
-                translationY = enterOffsetY.value
-            }
             .padding(20.dp)
     ) {
         // ---- header ----
@@ -254,16 +229,28 @@ fun TodayScreen(
     }
 }
 
-/** The route drawing, updating live as GPS fixes arrive. */
+/** The route drawing, updating live as GPS fixes arrive — with a visible status when it can't. */
 @Composable
 private fun LiveRouteCard(state: StrideUiState, onStopRoute: () -> Unit) {
+    val recording = state.recording
+    val hint = recordingStatusHint(recording.status)
+
     DarkCard(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            RecordingPulse(color = Lime)
-            Text("Drawing your route", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            RecordingPulse(
+                color = if (recording.status == RecordingStatus.TRACKING) Lime else Pink
+            )
+            Text(
+                text = recordingStatusLabel(recording.status),
+                color = TextPrimary,
+                style = MaterialTheme.typography.titleMedium
+            )
             Spacer(Modifier.weight(1f))
             Text(
-                text = "${state.recording.points.size} pts",
+                text = "${recording.points.size} pts",
                 color = TextMuted,
                 style = MaterialTheme.typography.labelMedium
             )
@@ -279,15 +266,30 @@ private fun LiveRouteCard(state: StrideUiState, onStopRoute: () -> Unit) {
                 .background(Lime.copy(alpha = 0.10f)),
             contentAlignment = Alignment.Center
         ) {
-            if (state.recording.points.size < 2) {
-                Text(
-                    text = "Waiting for a GPS fix…",
-                    color = TextMuted,
-                    style = MaterialTheme.typography.bodyMedium
-                )
+            if (recording.points.isEmpty()) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(20.dp)
+                ) {
+                    Text(
+                        text = recordingStatusLabel(recording.status),
+                        color = TextMuted,
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center
+                    )
+                    if (hint != null) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = hint,
+                            color = TextMuted.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
             } else {
                 RouteCanvas(
-                    points = state.recording.points,
+                    points = recording.points,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(12.dp),
@@ -300,7 +302,7 @@ private fun LiveRouteCard(state: StrideUiState, onStopRoute: () -> Unit) {
         Spacer(Modifier.height(14.dp))
 
         AnimatedDistance(
-            meters = state.recording.distanceMeters,
+            meters = recording.distanceMeters,
             unit = state.unit,
             style = MaterialTheme.typography.displayMedium,
             color = Lime
@@ -309,8 +311,8 @@ private fun LiveRouteCard(state: StrideUiState, onStopRoute: () -> Unit) {
         Spacer(Modifier.height(10.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatChip(Format.duration(state.recording.durationMillis))
-            StatChip(if (state.recording.points.size < 2) "acquiring GPS" else "recording")
+            StatChip(Format.duration(recording.durationMillis))
+            StatChip(if (recording.status == RecordingStatus.TRACKING) "recording" else "acquiring")
         }
     }
 }

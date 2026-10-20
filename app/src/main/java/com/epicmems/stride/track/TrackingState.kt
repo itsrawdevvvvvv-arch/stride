@@ -1,6 +1,7 @@
 package com.epicmems.stride.track
 
 import com.epicmems.stride.domain.LatLng
+import com.epicmems.stride.domain.RecordingStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
@@ -14,11 +15,13 @@ object TrackingState {
     val distanceMeters = MutableStateFlow(0.0)
     val durationMillis = MutableStateFlow(0L)
     val points = MutableStateFlow<List<LatLng>>(emptyList())
+    val status = MutableStateFlow(RecordingStatus.IDLE)
 
     fun reset() {
         recording.value = false
         distanceMeters.value = 0.0
         durationMillis.value = 0L
         points.value = emptyList()
+        status.value = RecordingStatus.IDLE
     }
 }

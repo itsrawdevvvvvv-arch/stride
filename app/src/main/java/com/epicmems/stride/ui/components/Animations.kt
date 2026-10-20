@@ -78,7 +78,7 @@ fun AnimatedSteps(
     style: TextStyle,
     color: Color,
     modifier: Modifier = Modifier,
-    durationMillis: Int = Motion.SLOW
+    durationMillis: Int = Motion.BASE
 ) {
     val animated by animateIntAsState(
         targetValue = value,

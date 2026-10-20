@@ -5,8 +5,11 @@ import java.util.Locale
 /** Small formatting helpers shared by the UI, the widget and exports. */
 object Format {
 
+    /** Hoisted so the animated counter doesn't allocate a Locale on every frame. */
+    private val INDIAN = Locale("en", "IN")
+
     /** 7842 -> "7,842" (Indian grouping). */
-    fun steps(value: Int): String = String.format(Locale("en", "IN"), "%,d", value)
+    fun steps(value: Int): String = String.format(INDIAN, "%,d", value)
 
     /** Metres to a short distance string in the given unit. */
     fun distance(meters: Double, unit: String): String {

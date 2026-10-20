@@ -1,8 +1,5 @@
 package com.epicmems.stride.ui.screens
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -27,30 +23,28 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.epicmems.stride.data.local.RoutePointEntity
 import com.epicmems.stride.domain.LatLng
+import com.epicmems.stride.domain.RecordingStatus
 import com.epicmems.stride.domain.RouteSummary
 import com.epicmems.stride.domain.StrideUiState
 import com.epicmems.stride.ui.components.AnimatedDistance
 import com.epicmems.stride.ui.components.DarkCard
 import com.epicmems.stride.ui.components.GhostButton
-import com.epicmems.stride.ui.components.Motion
 import com.epicmems.stride.ui.components.PastelCard
 import com.epicmems.stride.ui.components.PrimaryButton
 import com.epicmems.stride.ui.components.RecordingPulse
 import com.epicmems.stride.ui.components.RouteCanvas
 import com.epicmems.stride.ui.components.StatChip
+import com.epicmems.stride.ui.components.recordingStatusHint
+import com.epicmems.stride.ui.components.recordingStatusLabel
 import com.epicmems.stride.ui.theme.Lime
 import com.epicmems.stride.ui.theme.OnPastel
 import com.epicmems.stride.ui.theme.Peri
@@ -71,19 +65,10 @@ fun RoutesScreen(
     onStartRoute: () -> Unit,
     onStopRoute: () -> Unit
 ) {
-    var appeared by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { appeared = true }
-    val enterAlpha = animateFloatAsState(
-        targetValue = if (appeared) 1f else 0f,
-        animationSpec = tween(Motion.BASE, easing = FastOutSlowInEasing),
-        label = "enterAlpha"
-    )
-
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .graphicsLayer { alpha = enterAlpha.value }
             .padding(20.dp)
     ) {
         Text("Your routes", color = TextPrimary, style = MaterialTheme.typography.headlineLarge)
@@ -97,13 +82,23 @@ fun RoutesScreen(
         Spacer(Modifier.height(18.dp))
 
         if (state.recording.recording) {
+            val recording = state.recording
+            val hint = recordingStatusHint(recording.status)
+
             PastelCard(color = Lime, modifier = Modifier.fillMaxWidth()) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(9.dp)
+                ) {
                     RecordingPulse(color = OnPastel)
-                    Text("Recording", color = OnPastel, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = recordingStatusLabel(recording.status),
+                        color = OnPastel,
+                        style = MaterialTheme.typography.titleMedium
+                    )
                     Spacer(Modifier.weight(1f))
                     Text(
-                        text = "${state.recording.points.size} pts",
+                        text = "${recording.points.size} pts",
                         color = OnPastel.copy(alpha = 0.7f),
                         style = MaterialTheme.typography.labelMedium
                     )
@@ -112,13 +107,13 @@ fun RoutesScreen(
                 Spacer(Modifier.height(10.dp))
 
                 AnimatedDistance(
-                    meters = state.recording.distanceMeters,
+                    meters = recording.distanceMeters,
                     unit = state.unit,
                     style = MaterialTheme.typography.displayMedium,
                     color = OnPastel
                 )
                 Text(
-                    text = Format.duration(state.recording.durationMillis),
+                    text = Format.duration(recording.durationMillis),
                     color = OnPastel.copy(alpha = 0.7f),
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -133,15 +128,30 @@ fun RoutesScreen(
                         .background(OnPastel.copy(alpha = 0.08f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (state.recording.points.size < 2) {
-                        Text(
-                            text = "Waiting for a GPS fix…",
-                            color = OnPastel.copy(alpha = 0.6f),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                    if (recording.points.isEmpty()) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(20.dp)
+                        ) {
+                            Text(
+                                text = recordingStatusLabel(recording.status),
+                                color = OnPastel.copy(alpha = 0.75f),
+                                style = MaterialTheme.typography.titleMedium,
+                                textAlign = TextAlign.Center
+                            )
+                            if (hint != null) {
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    text = hint,
+                                    color = OnPastel.copy(alpha = 0.6f),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
                     } else {
                         RouteCanvas(
-                            points = state.recording.points,
+                            points = recording.points,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(12.dp),
