@@ -1,5 +1,6 @@
 package com.epicmems.stride.track
 
+import android.annotation.SuppressLint
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -83,6 +84,7 @@ class StepTrackingService : Service() {
         )
     }
 
+    @SuppressLint("MissingPermission") // FGS notification; POST_NOTIFICATIONS is optional
     private fun updateNotification(steps: Int) {
         runCatching {
             NotificationManagerCompat.from(this)

@@ -49,6 +49,14 @@ android {
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
+
+    lint {
+        abortOnError = true
+        warningsAsErrors = false
+        // Print every issue to the build log, not just the first one — CI is our compiler.
+        textReport = true
+        textOutput = "stdout"
+    }
 }
 
 dependencies {

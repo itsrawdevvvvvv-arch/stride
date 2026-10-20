@@ -1,6 +1,7 @@
 package com.epicmems.stride.track
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -62,6 +63,7 @@ class RouteTrackingService : Service() {
         override fun onProviderDisabled(provider: String) = Unit
     }
 
+    @SuppressLint("MissingPermission") // guarded by the checkSelfPermission call below
     override fun onCreate() {
         super.onCreate()
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
@@ -70,7 +72,10 @@ class RouteTrackingService : Service() {
         Notifications.ensureChannels(this)
         startInForeground("0.00 km", "0:00")
 
-        if (!hasLocationPermission()) {
+        // A route needs location; bail out cleanly if the user refused it.
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
             stopSelf()
             return
         }
@@ -165,10 +170,6 @@ class RouteTrackingService : Service() {
         updateNotification()
     }
 
-    private fun hasLocationPermission(): Boolean =
-        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
-            PackageManager.PERMISSION_GRANTED
-
     private fun startInForeground(distanceLabel: String, durationLabel: String) {
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
@@ -183,6 +184,7 @@ class RouteTrackingService : Service() {
         )
     }
 
+    @SuppressLint("MissingPermission") // FGS notification; POST_NOTIFICATIONS is optional
     private fun updateNotification() {
         runCatching {
             NotificationManagerCompat.from(this).notify(
