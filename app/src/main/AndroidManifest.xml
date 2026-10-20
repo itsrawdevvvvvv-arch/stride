@@ -17,6 +17,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Lets Stride ask to be exempt from battery optimisation so counting survives the
+         app being swiped away, and so the watchdog can restart tracking if an OEM kills it. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <uses-feature
         android:name="android.hardware.sensor.stepcounter"
         android:required="false" />
@@ -48,18 +52,22 @@
             </intent-filter>
         </activity>
 
-        <!-- Always-on step counting. -->
+        <!-- Always-on step counting.
+             stopWithTask="false" is what keeps it alive when the app is swiped out of Recents. -->
         <service
             android:name=".track.StepTrackingService"
             android:enabled="true"
             android:exported="false"
+            android:stopWithTask="false"
             android:foregroundServiceType="health" />
 
-        <!-- GPS route recording, started on demand. -->
+        <!-- GPS route recording, started on demand. Also survives task removal so a walk
+             isn't cut short if the app is swiped away mid-route. -->
         <service
             android:name=".track.RouteTrackingService"
             android:enabled="true"
             android:exported="false"
+            android:stopWithTask="false"
             android:foregroundServiceType="location" />
 
         <receiver

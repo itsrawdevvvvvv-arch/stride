@@ -17,7 +17,10 @@ import com.epicmems.stride.domain.RecordingState
 import com.epicmems.stride.domain.RouteSummary
 import com.epicmems.stride.domain.StrideUiState
 import com.epicmems.stride.track.StepSensorEngine
+import com.epicmems.stride.track.StepTrackingService
 import com.epicmems.stride.track.TrackingState
+import com.epicmems.stride.track.TrackingWatchdogWorker
+import com.epicmems.stride.util.BatteryOptimization
 import com.epicmems.stride.util.Dates
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +32,12 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
-private data class SettingsSnapshot(val goal: Int, val unit: String, val notifications: Boolean)
+private data class SettingsSnapshot(
+    val goal: Int,
+    val unit: String,
+    val notifications: Boolean,
+    val trackingEnabled: Boolean
+)
 
 /**
  * Everything derived from the stored days. Kept in its own snapshot so that
@@ -69,8 +77,13 @@ class StrideViewModel(private val container: AppContainer) : ViewModel() {
     private val selectedMonth = MutableStateFlow(today.withDayOfMonth(1))
 
     private val settingsFlow = combine(
-        settings.dailyGoal, settings.unit, settings.notificationsEnabled
-    ) { goal, unit, notifications -> SettingsSnapshot(goal, unit, notifications) }
+        settings.dailyGoal, settings.unit, settings.notificationsEnabled, settings.trackingEnabled
+    ) { goal, unit, notifications, tracking ->
+        SettingsSnapshot(goal, unit, notifications, tracking)
+    }
+
+    /** Refreshed from the Settings screen — reading it on every emission would hit the system service. */
+    private val batteryExempt = MutableStateFlow(BatteryOptimization.isExempt(container.appContext))
 
     private val trackingFlow = combine(
         TrackingState.recording,
@@ -104,8 +117,8 @@ class StrideViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     val uiState: StateFlow<StrideUiState> = combine(
-        statsFlow, volatileFlow, settingsFlow
-    ) { stats, volatile, snapshot ->
+        statsFlow, volatileFlow, settingsFlow, batteryExempt
+    ) { stats, volatile, snapshot, exempt ->
         StrideUiState(
             loading = false,
             today = today,
@@ -128,7 +141,9 @@ class StrideViewModel(private val container: AppContainer) : ViewModel() {
             goalHitRate30 = stats.goalHitRate30,
             completedThisMonth = stats.completedThisMonth,
             routes = volatile.routes,
-            recording = volatile.recording
+            recording = volatile.recording,
+            trackingEnabled = snapshot.trackingEnabled,
+            batteryExempt = exempt
         )
     }.stateIn(
         scope = viewModelScope,
@@ -167,6 +182,24 @@ class StrideViewModel(private val container: AppContainer) : ViewModel() {
 
     fun setNotificationsEnabled(value: Boolean) =
         viewModelScope.launch { settings.setNotificationsEnabled(value) }
+
+    /** Turns always-on tracking on or off: the service plus its watchdog. */
+    fun setTrackingEnabled(enabled: Boolean) = viewModelScope.launch {
+        settings.setTrackingEnabled(enabled)
+        val context = container.appContext
+        if (enabled) {
+            TrackingWatchdogWorker.schedule(context)
+            StepTrackingService.start(context)
+        } else {
+            TrackingWatchdogWorker.cancel(context)
+            StepTrackingService.stop(context)
+        }
+    }
+
+    /** Call when the Settings screen becomes visible, to pick up a battery-exemption change. */
+    fun refreshBatteryState() {
+        batteryExempt.value = BatteryOptimization.isExempt(container.appContext)
+    }
 
     fun toggleMarked(date: LocalDate) = viewModelScope.launch { stepRepository.toggleMarked(date) }
 

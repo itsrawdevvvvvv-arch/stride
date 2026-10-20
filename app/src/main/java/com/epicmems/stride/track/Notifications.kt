@@ -70,9 +70,10 @@ object Notifications {
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_stat_stride)
             .setContentIntent(contentIntent(context))
-            .addAction(0, context.getString(R.string.notif_stop), stopIntent(context, StepTrackingService::class.java))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }

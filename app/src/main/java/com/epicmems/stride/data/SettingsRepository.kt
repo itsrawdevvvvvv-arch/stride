@@ -22,6 +22,7 @@ class SettingsRepository(private val context: Context) {
         val DAILY_GOAL = intPreferencesKey("daily_goal")
         val UNIT = stringPreferencesKey("unit")
         val NOTIFICATIONS = booleanPreferencesKey("notifications_enabled")
+        val TRACKING_ENABLED = booleanPreferencesKey("tracking_enabled")
         val LAST_RAW = floatPreferencesKey("last_raw_counter")
     }
 
@@ -30,7 +31,13 @@ class SettingsRepository(private val context: Context) {
     val notificationsEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[Keys.NOTIFICATIONS] ?: true }
 
+    /** Always-on tracking. On by default — the whole point of the app. */
+    val trackingEnabled: Flow<Boolean> =
+        context.dataStore.data.map { it[Keys.TRACKING_ENABLED] ?: true }
+
     suspend fun currentGoal(): Int = dailyGoal.first()
+
+    suspend fun isTrackingEnabled(): Boolean = trackingEnabled.first()
 
     suspend fun setDailyGoal(value: Int) {
         context.dataStore.edit { it[Keys.DAILY_GOAL] = value.coerceIn(1_000, 50_000) }
@@ -42,6 +49,10 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setNotificationsEnabled(value: Boolean) {
         context.dataStore.edit { it[Keys.NOTIFICATIONS] = value }
+    }
+
+    suspend fun setTrackingEnabled(value: Boolean) {
+        context.dataStore.edit { it[Keys.TRACKING_ENABLED] = value }
     }
 
     suspend fun lastRaw(): Float = context.dataStore.data.first()[Keys.LAST_RAW] ?: 0f

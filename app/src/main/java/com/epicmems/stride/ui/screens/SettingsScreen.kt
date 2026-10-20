@@ -28,6 +28,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -51,6 +52,7 @@ import com.epicmems.stride.ui.theme.Surface2
 import com.epicmems.stride.ui.theme.Surface3
 import com.epicmems.stride.ui.theme.TextMuted
 import com.epicmems.stride.ui.theme.TextPrimary
+import com.epicmems.stride.util.BatteryOptimization
 import com.epicmems.stride.util.Format
 import kotlinx.coroutines.launch
 
@@ -77,6 +79,9 @@ fun SettingsScreen(state: StrideUiState, viewModel: StrideViewModel) {
             .padding(20.dp)
     ) {
         Text("Settings", color = TextPrimary, style = MaterialTheme.typography.headlineLarge)
+
+        // Pick up a battery-exemption change made in the system dialog.
+        LaunchedEffect(Unit) { viewModel.refreshBatteryState() }
 
         Spacer(Modifier.height(18.dp))
 
@@ -150,6 +155,73 @@ fun SettingsScreen(state: StrideUiState, viewModel: StrideViewModel) {
                         uncheckedThumbColor = TextMuted,
                         uncheckedTrackColor = Surface3
                     )
+                )
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        // ---- always-on tracking ----
+        DarkCard(modifier = Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = "Always-on tracking",
+                        color = TextPrimary,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Keeps counting when Stride is closed or swiped out of Recents.",
+                        color = TextMuted,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                Spacer(Modifier.size(12.dp))
+                Switch(
+                    checked = state.trackingEnabled,
+                    onCheckedChange = { viewModel.setTrackingEnabled(it) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = OnPastel,
+                        checkedTrackColor = Lime,
+                        uncheckedThumbColor = TextMuted,
+                        uncheckedTrackColor = Surface3
+                    )
+                )
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        // ---- battery optimisation ----
+        DarkCard(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "Battery optimisation",
+                color = TextPrimary,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = if (state.batteryExempt) {
+                    "Stride is exempt — the system won't put counting to sleep."
+                } else {
+                    "Many phones pause background apps. Exempting Stride keeps counting reliable " +
+                        "even after you close the app."
+                },
+                color = TextMuted,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(Modifier.height(14.dp))
+            if (state.batteryExempt) {
+                Text("Active", color = Lime, style = MaterialTheme.typography.labelLarge)
+            } else {
+                GhostButton(
+                    text = "Allow background running",
+                    onClick = {
+                        runCatching {
+                            context.startActivity(BatteryOptimization.requestIntent(context))
+                        }
+                    }
                 )
             }
         }

@@ -90,5 +90,9 @@ data class StrideUiState(
     val goalHitRate30: Int = 0,
     val completedThisMonth: Int = 0,
     val routes: List<RouteSummary> = emptyList(),
-    val recording: RecordingState = RecordingState()
+    val recording: RecordingState = RecordingState(),
+    /** Always-on tracking preference. */
+    val trackingEnabled: Boolean = true,
+    /** Whether the system has exempted Stride from battery optimisation. */
+    val batteryExempt: Boolean = false
 )
