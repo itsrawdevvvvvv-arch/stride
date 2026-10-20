@@ -2,12 +2,9 @@ package com.epicmems.stride.ui.components
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -18,7 +15,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -27,6 +28,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.epicmems.stride.util.Format
+import kotlinx.coroutines.delay
 
 /** One set of timings for the whole app, so every motion feels like one system. */
 object Motion {
@@ -43,8 +45,8 @@ object Motion {
 /**
  * Scale-on-press feedback.
  *
- * The scale is read inside `graphicsLayer`, which means the animation runs entirely on the
- * draw phase — pressing a button never causes a recomposition.
+ * The scale is read inside `graphicsLayer`, so the animation runs entirely on the draw phase —
+ * pressing a button never causes a recomposition.
  */
 @Composable
 fun Modifier.pressScale(
@@ -100,7 +102,12 @@ fun AnimatedDistance(
         animationSpec = tween(Motion.BASE, easing = FastOutSlowInEasing),
         label = "animatedDistance"
     )
-    Text(text = Format.distance(animated.toDouble(), unit), style = style, color = color, modifier = modifier)
+    Text(
+        text = Format.distance(animated.toDouble(), unit),
+        style = style,
+        color = color,
+        modifier = modifier
+    )
 }
 
 /** A dot that breathes while a route is being recorded. */
@@ -110,14 +117,16 @@ fun RecordingPulse(
     modifier: Modifier = Modifier,
     dotSize: Dp = 10.dp
 ) {
-    val transition = rememberInfiniteTransition(label = "recordingPulse")
-    val alphaState = transition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0.25f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
+    var bright by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(900)
+            bright = !bright
+        }
+    }
+    val alphaState = animateFloatAsState(
+        targetValue = if (bright) 1f else 0.25f,
+        animationSpec = tween(900, easing = LinearEasing),
         label = "pulseAlpha"
     )
     Box(
