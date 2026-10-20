@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Stride</string>
+    <string name="channel_tracking_name">Step tracking</string>
+    <string name="channel_tracking_desc">Keeps counting your steps in the background.</string>
+    <string name="notif_title">Stride is counting</string>
+    <string name="notif_text_idle">Waiting for movement…</string>
+</resources>
