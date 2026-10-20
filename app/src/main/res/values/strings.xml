@@ -1,7 +1,27 @@
 <resources>
     <string name="app_name">Stride</string>
-    <string name="channel_tracking_name">Step tracking</string>
-    <string name="channel_tracking_desc">Keeps counting your steps in the background.</string>
-    <string name="notif_title">Stride is counting</string>
-    <string name="notif_text_idle">Waiting for movement…</string>
+
+    <!-- Notification channels -->
+    <string name="channel_steps_name">Step tracking</string>
+    <string name="channel_steps_desc">Keeps counting your steps in the background.</string>
+    <string name="channel_routes_name">Route recording</string>
+    <string name="channel_routes_desc">Shows the route being recorded right now.</string>
+
+    <!-- Notifications -->
+    <string name="notif_steps_title">Stride is counting</string>
+    <string name="notif_steps_idle">Waiting for movement…</string>
+    <string name="notif_stop">Stop</string>
+    <string name="notif_route_title">Recording route</string>
+
+    <!-- Widget -->
+    <string name="widget_label">Stride steps</string>
+    <string name="widget_description">Today\'s step count and goal progress.</string>
+
+    <!-- Content descriptions -->
+    <string name="cd_avatar">Profile</string>
+    <string name="cd_more">More</string>
+    <string name="cd_back">Back</string>
+    <string name="cd_prev_month">Previous month</string>
+    <string name="cd_next_month">Next month</string>
+    <string name="cd_route_map">Route map</string>
 </resources>

@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="paper">#ECECE8</color>
-    <color name="ink">#1C1C1C</color>
-    <color name="card">#F7F7F4</color>
-    <color name="accent">#5B6B8C</color>
+    <color name="bg">#141414</color>
+    <color name="surface">#1F1F1F</color>
+    <color name="surface_2">#2A2A2A</color>
+    <color name="text">#FFFFFF</color>
+    <color name="lime">#D4F36B</color>
+    <color name="pink">#F7C3D0</color>
+    <color name="peri">#C6C9F2</color>
+    <color name="mint">#A9E5CF</color>
+    <color name="ic_launcher_background">#141414</color>
 </resources>

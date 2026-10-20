@@ -1,7 +1,6 @@
 package com.epicmems.stride
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -12,7 +11,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.epicmems.stride.step.StepCounterService
+import com.epicmems.stride.track.RouteTrackingService
+import com.epicmems.stride.track.StepTrackingService
 import com.epicmems.stride.ui.StrideRoot
 import com.epicmems.stride.ui.StrideViewModel
 import com.epicmems.stride.ui.StrideViewModelFactory
@@ -20,12 +20,19 @@ import com.epicmems.stride.ui.theme.StrideTheme
 
 class MainActivity : ComponentActivity() {
 
+    /** Set when the user asked to start a route but we still need location permission. */
+    private var pendingRouteStart = false
+
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { result ->
-        if (result[Manifest.permission.ACTIVITY_RECOGNITION] == true) {
-            startTracking()
+    ) { granted ->
+        if (granted[Manifest.permission.ACTIVITY_RECOGNITION] == true) {
+            StepTrackingService.start(this)
         }
+        if (pendingRouteStart && granted[Manifest.permission.ACCESS_FINE_LOCATION] == true) {
+            RouteTrackingService.start(this)
+        }
+        pendingRouteStart = false
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,27 +45,24 @@ class MainActivity : ComponentActivity() {
 
                 LaunchedEffect(Unit) {
                     val missing = mutableListOf<String>()
-                    if (!hasActivityPermission()) {
+                    if (!has(Manifest.permission.ACTIVITY_RECOGNITION)) {
                         missing += Manifest.permission.ACTIVITY_RECOGNITION
                     }
-                    if (Build.VERSION.SDK_INT >= 33 &&
-                        ContextCompat.checkSelfPermission(
-                            this@MainActivity,
-                            Manifest.permission.POST_NOTIFICATIONS
-                        ) != PackageManager.PERMISSION_GRANTED
-                    ) {
+                    if (Build.VERSION.SDK_INT >= 33 && !has(Manifest.permission.POST_NOTIFICATIONS)) {
                         missing += Manifest.permission.POST_NOTIFICATIONS
                     }
-                    if (missing.isNotEmpty()) {
-                        permissionLauncher.launch(missing.toTypedArray())
+                    if (missing.isEmpty()) {
+                        StepTrackingService.start(this@MainActivity)
                     } else {
-                        startTracking()
+                        permissionLauncher.launch(missing.toTypedArray())
                     }
                 }
 
                 StrideRoot(
                     viewModel = vm,
-                    onRequestPermission = {
+                    onStartRoute = { requestRouteStart() },
+                    onStopRoute = { RouteTrackingService.stop(this) },
+                    onRequestTrackingPermission = {
                         permissionLauncher.launch(arrayOf(Manifest.permission.ACTIVITY_RECOGNITION))
                     }
                 )
@@ -66,16 +70,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun hasActivityPermission(): Boolean =
-        ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.ACTIVITY_RECOGNITION
-        ) == PackageManager.PERMISSION_GRANTED
-
-    private fun startTracking() {
-        ContextCompat.startForegroundService(
-            this,
-            Intent(this, StepCounterService::class.java)
-        )
+    private fun requestRouteStart() {
+        if (has(Manifest.permission.ACCESS_FINE_LOCATION)) {
+            RouteTrackingService.start(this)
+        } else {
+            pendingRouteStart = true
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
     }
+
+    private fun has(permission: String): Boolean =
+        ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 }

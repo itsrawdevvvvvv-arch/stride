@@ -1,75 +1,121 @@
 package com.epicmems.stride.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Map
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.epicmems.stride.ui.screens.HistoryScreen
-import com.epicmems.stride.ui.screens.PatternsScreen
+import com.epicmems.stride.ui.screens.CalendarScreen
+import com.epicmems.stride.ui.screens.RouteDetailScreen
+import com.epicmems.stride.ui.screens.RoutesScreen
 import com.epicmems.stride.ui.screens.SettingsScreen
 import com.epicmems.stride.ui.screens.TodayScreen
-import com.epicmems.stride.ui.theme.CardWhite
-import com.epicmems.stride.ui.theme.Ink
-import com.epicmems.stride.ui.theme.InkLine
-import com.epicmems.stride.ui.theme.InkSoft
-import com.epicmems.stride.ui.theme.MarkerFont
-import com.epicmems.stride.ui.theme.Paper
+import com.epicmems.stride.ui.theme.Bg
+import com.epicmems.stride.ui.theme.Lime
+import com.epicmems.stride.ui.theme.OnPastel
+import com.epicmems.stride.ui.theme.Pink
+import com.epicmems.stride.ui.theme.TextMuted
 
 private data class Tab(val label: String, val icon: ImageVector)
 
 @Composable
 fun StrideRoot(
     viewModel: StrideViewModel,
-    onRequestPermission: () -> Unit
+    onStartRoute: () -> Unit,
+    onStopRoute: () -> Unit,
+    onRequestTrackingPermission: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var selected by rememberSaveable { mutableIntStateOf(0) }
+    var tab by rememberSaveable { mutableStateOf(0) }
+    var detailRouteId by rememberSaveable { mutableStateOf(-1L) }
 
     val tabs = listOf(
-        Tab("Today", Icons.Filled.Home),
-        Tab("Patterns", Icons.Filled.BarChart),
-        Tab("History", Icons.Filled.List),
-        Tab("Settings", Icons.Filled.Settings)
+        Tab("Today", Icons.Rounded.Home),
+        Tab("Routes", Icons.Rounded.Map),
+        Tab("Calendar", Icons.Rounded.CalendarMonth),
+        Tab("Settings", Icons.Rounded.Settings)
     )
 
     Scaffold(
-        containerColor = Paper,
+        containerColor = Bg,
         bottomBar = {
-            StrideBottomBar(tabs = tabs, selected = selected, onSelect = { selected = it })
+            if (detailRouteId < 0L) {
+                StrideBottomBar(
+                    tabs = tabs,
+                    selected = tab,
+                    recording = state.recording.recording,
+                    onSelect = { tab = it },
+                    onToggleRoute = {
+                        if (state.recording.recording) onStopRoute() else onStartRoute()
+                    }
+                )
+            }
         }
-    ) { innerPadding ->
-        Box(Modifier.padding(innerPadding)) {
-            when (selected) {
-                0 -> TodayScreen(state)
-                1 -> PatternsScreen(state)
-                2 -> HistoryScreen(state)
-                else -> SettingsScreen(state, viewModel, onRequestPermission)
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            when {
+                detailRouteId >= 0L -> RouteDetailScreen(
+                    routeId = detailRouteId,
+                    viewModel = viewModel,
+                    onBack = { detailRouteId = -1L }
+                )
+
+                tab == 0 -> TodayScreen(
+                    state = state,
+                    onRequestTrackingPermission = onRequestTrackingPermission,
+                    onStartRoute = onStartRoute,
+                    onStopRoute = onStopRoute
+                )
+
+                tab == 1 -> RoutesScreen(
+                    state = state,
+                    routePoints = viewModel::routePoints,
+                    onOpenRoute = { detailRouteId = it },
+                    onStartRoute = onStartRoute,
+                    onStopRoute = onStopRoute
+                )
+
+                tab == 2 -> CalendarScreen(
+                    state = state,
+                    onToggleDay = { viewModel.toggleMarked(it) },
+                    onPreviousMonth = { viewModel.previousMonth() },
+                    onNextMonth = { viewModel.nextMonth() }
+                )
+
+                else -> SettingsScreen(state = state, viewModel = viewModel)
             }
         }
     }
@@ -79,44 +125,64 @@ fun StrideRoot(
 private fun StrideBottomBar(
     tabs: List<Tab>,
     selected: Int,
-    onSelect: (Int) -> Unit
+    recording: Boolean,
+    onSelect: (Int) -> Unit,
+    onToggleRoute: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Paper)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .background(Bg)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        tabs.forEachIndexed { index, tab ->
-            val active = index == selected
-            Surface(
-                onClick = { onSelect(index) },
-                shape = CircleShape,
-                color = if (active) Ink else CardWhite,
-                border = BorderStroke(1.5.dp, InkLine),
-                modifier = Modifier.weight(1f)
-            ) {
-                Column(
-                    modifier = Modifier.padding(vertical = 8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Icon(
-                        imageVector = tab.icon,
-                        contentDescription = tab.label,
-                        tint = if (active) CardWhite else Ink,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Text(
-                        text = tab.label,
-                        fontFamily = MarkerFont,
-                        fontSize = 11.sp,
-                        color = if (active) CardWhite else InkSoft
-                    )
-                }
-            }
+        NavItem(tabs[0], selected == 0) { onSelect(0) }
+        NavItem(tabs[1], selected == 1) { onSelect(1) }
+
+        // Floating action: start / stop GPS route recording
+        Box(
+            modifier = Modifier
+                .offset(y = (-14).dp)
+                .size(58.dp)
+                .clip(CircleShape)
+                .background(if (recording) Pink else Lime)
+                .clickable(onClick = onToggleRoute),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (recording) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
+                contentDescription = if (recording) "Stop route" else "Start route",
+                tint = OnPastel,
+                modifier = Modifier.size(28.dp)
+            )
         }
+
+        NavItem(tabs[2], selected == 2) { onSelect(2) }
+        NavItem(tabs[3], selected == 3) { onSelect(3) }
+    }
+}
+
+@Composable
+private fun NavItem(tab: Tab, active: Boolean, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .clip(CircleShape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Icon(
+            imageVector = tab.icon,
+            contentDescription = tab.label,
+            tint = if (active) Lime else TextMuted,
+            modifier = Modifier.size(22.dp)
+        )
+        Text(
+            text = tab.label,
+            color = if (active) Lime else TextMuted,
+            style = MaterialTheme.typography.labelSmall
+        )
     }
 }

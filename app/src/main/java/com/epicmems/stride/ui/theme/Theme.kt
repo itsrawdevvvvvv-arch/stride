@@ -1,22 +1,24 @@
 package com.epicmems.stride.ui.theme
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 
-private val StrideColors = lightColorScheme(
-    primary = Ink,
-    onPrimary = CardWhite,
-    secondary = Accent,
-    onSecondary = CardWhite,
-    background = Paper,
-    onBackground = Ink,
-    surface = CardWhite,
-    onSurface = Ink,
-    surfaceVariant = PaperDeep,
-    onSurfaceVariant = InkSoft,
-    outline = InkLine,
-    outlineVariant = TrackGray
+private val StrideColors = darkColorScheme(
+    primary = Lime,
+    onPrimary = OnPastel,
+    secondary = Pink,
+    onSecondary = OnPastel,
+    tertiary = Peri,
+    onTertiary = OnPastel,
+    background = Bg,
+    onBackground = TextPrimary,
+    surface = Surface1,
+    onSurface = TextPrimary,
+    surfaceVariant = Surface2,
+    onSurfaceVariant = TextMuted2,
+    outline = Line,
+    outlineVariant = Surface3
 )
 
 @Composable
