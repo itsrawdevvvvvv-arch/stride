@@ -1,20 +1,25 @@
 package com.epicmems.stride.di
 
 import android.content.Context
+import com.epicmems.stride.data.RouteRepository
 import com.epicmems.stride.data.SettingsRepository
 import com.epicmems.stride.data.StepRepository
-import com.epicmems.stride.data.local.StepDatabase
-import com.epicmems.stride.step.StepSensorEngine
+import com.epicmems.stride.data.local.StrideDatabase
+import com.epicmems.stride.track.StepSensorEngine
 
 /**
- * Tiny hand-rolled dependency container. One instance lives on [com.epicmems.stride.StrideApp].
+ * Tiny hand-rolled dependency container — one instance lives on
+ * [com.epicmems.stride.StrideApp]. Keeps the app free of a DI framework while staying
+ * testable: repositories take their DAOs, and nothing reaches for a global singleton.
  */
 class AppContainer(context: Context) {
 
-    private val appContext = context.applicationContext
-    private val database = StepDatabase.get(appContext)
+    val appContext: Context = context.applicationContext
+
+    private val database = StrideDatabase.get(appContext)
 
     val settingsRepository = SettingsRepository(appContext)
     val stepRepository = StepRepository(database.stepDao(), settingsRepository)
+    val routeRepository = RouteRepository(database.routeDao())
     val stepSensorEngine = StepSensorEngine(appContext, stepRepository, settingsRepository)
 }

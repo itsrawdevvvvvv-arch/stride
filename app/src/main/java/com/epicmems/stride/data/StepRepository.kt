@@ -4,13 +4,14 @@ import com.epicmems.stride.data.local.StepDao
 import com.epicmems.stride.data.local.StepDay
 import com.epicmems.stride.data.local.StepHour
 import com.epicmems.stride.util.Dates
-import com.epicmems.stride.util.DemoData
+import com.epicmems.stride.util.SampleData
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 /**
- * Single source of truth for step data. Writes come from the sensor engine; reads feed the UI.
+ * Single source of truth for step data. Writes come from the tracking service;
+ * reads feed the UI, the widget and exports.
  */
 class StepRepository(
     private val dao: StepDao,
@@ -18,21 +19,27 @@ class StepRepository(
 ) {
 
     fun observeAll(): Flow<List<StepDay>> = dao.observeAll()
-    fun observeHours(date: String): Flow<List<StepHour>> = dao.observeHours(date)
     fun observeDay(date: String): Flow<StepDay?> = dao.observeDay(date)
+    fun observeHours(date: String): Flow<List<StepHour>> = dao.observeHours(date)
 
-    /** Adds [delta] steps to the current day + hour bucket. */
+    suspend fun allDays(): List<StepDay> = dao.all()
+    suspend fun daysBetween(from: LocalDate, to: LocalDate): List<StepDay> =
+        dao.daysBetween(Dates.key(from), Dates.key(to))
+
+    /** Adds [delta] steps to the current day and hour bucket. */
     suspend fun addSteps(delta: Int, at: LocalDateTime = Dates.now()) {
         if (delta <= 0) return
         val key = Dates.key(at.toLocalDate())
         val goal = settings.currentGoal()
         val existing = dao.day(key)
+        val steps = (existing?.steps ?: 0) + delta
         dao.upsert(
             StepDay(
                 date = key,
-                steps = (existing?.steps ?: 0) + delta,
+                steps = steps,
                 goal = goal,
-                isDemo = false,
+                distanceMeters = steps * METERS_PER_STEP,
+                marked = existing?.marked ?: false,
                 updatedAt = System.currentTimeMillis()
             )
         )
@@ -40,27 +47,32 @@ class StepRepository(
         dao.upsertHour(StepHour(key, at.hour, (hourRow?.steps ?: 0) + delta))
     }
 
-    suspend fun seedDemoIfNeeded() {
-        if (settings.demoSeeded.first()) return
-        seedDemo()
+    /** Tapping a day in the calendar toggles its manual "completed" mark. */
+    suspend fun toggleMarked(date: LocalDate) {
+        val key = Dates.key(date)
+        val existing = dao.day(key)
+        if (existing == null) {
+            dao.upsert(StepDay(key, steps = 0, goal = settings.currentGoal(), marked = true))
+        } else {
+            dao.setMarked(key, !existing.marked)
+        }
     }
 
-    suspend fun seedDemo() {
+    /** Loads a realistic sample history so the charts have something to show. */
+    suspend fun loadSampleData(days: Int = 30) {
         val goal = settings.currentGoal()
-        val (days, hours) = DemoData.generate(45, goal)
-        dao.upsertAll(days)
-        dao.upsertHours(hours)
-        settings.setDemoSeeded(true)
-    }
-
-    suspend fun clearDemo() {
-        dao.clearDemoHours()
-        dao.clearDemoDays()
-        settings.setDemoSeeded(true)
+        val (dayRows, hourRows) = SampleData.history(days, goal)
+        dao.upsertAll(dayRows)
+        dao.upsertHours(hourRows)
     }
 
     suspend fun clearAll() {
-        dao.clearAllHours()
-        dao.clearAllDays()
+        dao.clearHours()
+        dao.clearDays()
+    }
+
+    companion object {
+        /** Average stride length used to turn steps into an approximate distance. */
+        const val METERS_PER_STEP = 0.75
     }
 }
