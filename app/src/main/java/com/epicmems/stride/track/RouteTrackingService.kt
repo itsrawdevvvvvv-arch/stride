@@ -207,6 +207,7 @@ class RouteTrackingService : Service() {
      * If GPS hasn't produced anything after a while (walking between buildings, or a cold
      * start), also listen to the network provider so the user still gets a drawing.
      */
+    @SuppressLint("MissingPermission") // guarded by hasLocationPermission() in onCreate
     private fun scheduleNetworkFallback() {
         mainScope.launch {
             delay(FALLBACK_AFTER_MS)
