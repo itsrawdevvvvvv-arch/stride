@@ -28,8 +28,28 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # Produces app-release-unsigned.apk. To ship a signed build, add your keystore as
-      # repository secrets and a signingConfig to app/build.gradle.kts.
+      # Same stable key as CI, so a release APK also installs over a previous build.
+      - name: Prepare signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.STRIDE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.STRIDE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.STRIDE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.STRIDE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64:-}" ]; then
+            echo "No signing key configured — the release APK will be unsigned."
+            exit 0
+          fi
+          mkdir -p "$RUNNER_TEMP/signing"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/signing/stride.p12"
+          {
+            echo "STRIDE_KEYSTORE_PATH=$RUNNER_TEMP/signing/stride.p12"
+            echo "STRIDE_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "STRIDE_KEY_ALIAS=$KEY_ALIAS"
+            echo "STRIDE_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
       - name: Build release
         run: ./gradlew assembleRelease --stacktrace
 

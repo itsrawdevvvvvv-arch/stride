@@ -19,9 +19,36 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    /**
+     * One stable signing key for every build.
+     *
+     * This is what makes a new APK install *over* the previous one. GitHub's runners are wiped
+     * between runs, so without this each build generated a brand-new debug key and Android
+     * rejected the update with a signature mismatch — forcing an uninstall every time.
+     *
+     * The key comes from CI as the STRIDE_KEYSTORE_* environment variables (repository
+     * secrets). When they are absent — a normal local build — AGP falls back to the default
+     * debug keystore, so `./gradlew assembleDebug` still works on its own.
+     */
+    signingConfigs {
+        create("stride") {
+            val path = System.getenv("STRIDE_KEYSTORE_PATH")
+            if (!path.isNullOrBlank() && file(path).exists()) {
+                storeFile = file(path)
+                storeType = "PKCS12"
+                storePassword = System.getenv("STRIDE_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("STRIDE_KEY_ALIAS")
+                keyPassword = System.getenv("STRIDE_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
+            signingConfigs.findByName("stride")
+                ?.takeIf { it.storeFile != null }
+                ?.let { signingConfig = it }
         }
         release {
             isMinifyEnabled = true
@@ -30,6 +57,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfigs.findByName("stride")
+                ?.takeIf { it.storeFile != null }
+                ?.let { signingConfig = it }
         }
     }
 
