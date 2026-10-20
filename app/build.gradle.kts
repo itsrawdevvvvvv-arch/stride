@@ -55,7 +55,7 @@ android {
         warningsAsErrors = false
         // Print every issue to the build log, not just the first one — CI is our compiler.
         textReport = true
-        textOutput = "stdout"
+        textOutput = file("stdout")
     }
 }
 
