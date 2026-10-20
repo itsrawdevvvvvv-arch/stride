@@ -1,8 +1,12 @@
 package com.epicmems.stride.ui.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -10,6 +14,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,9 +23,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -89,14 +96,21 @@ fun PillRow(
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null
 ) {
+    val interaction = remember { MutableInteractionSource() }
     val background = if (selected) Lime else Surface2
     val foreground = if (selected) OnPastel else TextPrimary
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(CircleShape)
             .background(background)
-            .clickable(onClick = onClick)
+            .pressScale(interaction)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = onClick
+            )
             .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(13.dp)
@@ -121,12 +135,19 @@ fun PrimaryButton(
     enabled: Boolean = true,
     leading: (@Composable () -> Unit)? = null
 ) {
+    val interaction = remember { MutableInteractionSource() }
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(CircleShape)
             .background(if (enabled) Lime else Surface3)
-            .clickable(enabled = enabled, onClick = onClick)
+            .pressScale(interaction)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick
+            )
             .padding(vertical = 16.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
@@ -150,12 +171,19 @@ fun GhostButton(
     enabled: Boolean = true,
     leading: (@Composable () -> Unit)? = null
 ) {
+    val interaction = remember { MutableInteractionSource() }
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(CircleShape)
             .background(Surface2)
-            .clickable(enabled = enabled, onClick = onClick)
+            .pressScale(interaction)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick
+            )
             .padding(vertical = 16.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
@@ -180,7 +208,46 @@ fun StatChip(text: String, modifier: Modifier = Modifier, background: Color = Su
     )
 }
 
-/** Circular progress ring. */
+/**
+ * Rounded progress bar. The fill width is read inside the Canvas draw lambda, so animating it
+ * only triggers a redraw — never a recomposition or a layout pass.
+ */
+@Composable
+fun ProgressPill(
+    progress: Float,
+    track: Color,
+    fill: Color,
+    modifier: Modifier = Modifier,
+    height: Dp = 12.dp
+) {
+    val target = progress.coerceIn(0f, 1f)
+    val animated = animateFloatAsState(
+        targetValue = target,
+        animationSpec = tween(Motion.BASE, easing = FastOutSlowInEasing),
+        label = "progressPill"
+    )
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
+    ) {
+        val radius = size.height / 2f
+        drawRoundRect(
+            color = track,
+            cornerRadius = CornerRadius(radius, radius)
+        )
+        val width = size.width * animated.value
+        if (width > 0.5f) {
+            drawRoundRect(
+                color = fill,
+                size = Size(width, size.height),
+                cornerRadius = CornerRadius(radius, radius)
+            )
+        }
+    }
+}
+
+/** Circular progress ring whose sweep eases to the new value (draw-phase only). */
 @Composable
 fun StepRing(
     progress: Float,
@@ -190,6 +257,12 @@ fun StepRing(
     ringSize: Dp = 96.dp,
     stroke: Dp = 10.dp
 ) {
+    val target = progress.coerceIn(0f, 1f)
+    val animated = animateFloatAsState(
+        targetValue = target,
+        animationSpec = tween(Motion.SLOW, easing = FastOutSlowInEasing),
+        label = "ringProgress"
+    )
     Canvas(modifier = modifier.size(ringSize)) {
         val strokePx = stroke.toPx()
         val radius = (this.size.minDimension - strokePx) / 2f
@@ -199,7 +272,7 @@ fun StepRing(
         drawArc(
             color = ringColor,
             startAngle = -90f,
-            sweepAngle = 360f * progress.coerceIn(0f, 1f),
+            sweepAngle = 360f * animated.value,
             useCenter = false,
             topLeft = Offset(center.x - radius, center.y - radius),
             size = Size(radius * 2f, radius * 2f),

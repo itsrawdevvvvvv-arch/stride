@@ -1,7 +1,12 @@
 package com.epicmems.stride.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -19,7 +24,11 @@ import com.epicmems.stride.domain.Geo
 import com.epicmems.stride.domain.LatLng
 import com.epicmems.stride.ui.theme.Lime
 
-/** Bars for the last N days with a dashed goal line. */
+/**
+ * Bars for the last N days with a dashed goal line. The bars grow in once when the chart
+ * first has data; afterwards the reveal value is read inside the draw lambda, so live data
+ * changes only trigger a redraw.
+ */
 @Composable
 fun WeekBars(
     days: List<DayStat>,
@@ -29,28 +38,39 @@ fun WeekBars(
     trackColor: Color,
     accentColor: Color = Lime
 ) {
+    val reveal = remember { Animatable(0f) }
+    LaunchedEffect(days.size) {
+        if (days.isNotEmpty()) {
+            reveal.snapTo(0f)
+            reveal.animateTo(1f, tween(Motion.SLOW, easing = FastOutSlowInEasing))
+        }
+    }
+
     Canvas(modifier) {
         if (days.isEmpty()) return@Canvas
         val count = days.size
         val gap = size.width * 0.02f
         val barWidth = (size.width - gap * (count - 1)) / count
         val maxValue = maxOf(days.maxOf { it.steps }, goal, 1).toFloat()
+        val grow = reveal.value
 
         days.forEachIndexed { index, day ->
             val x = index * (barWidth + gap)
-            val barHeight = (day.steps / maxValue) * size.height
+            val barHeight = (day.steps / maxValue) * size.height * grow
+            val radius = CornerRadius(barWidth / 2f, barWidth / 2f)
+
             drawRoundRect(
                 color = trackColor,
                 topLeft = Offset(x, 0f),
                 size = Size(barWidth, size.height),
-                cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f)
+                cornerRadius = radius
             )
             if (barHeight > 0.5f) {
                 drawRoundRect(
                     color = if (day.goalHit) accentColor else barColor,
                     topLeft = Offset(x, size.height - barHeight),
                     size = Size(barWidth, barHeight),
-                    cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f)
+                    cornerRadius = radius
                 )
             }
         }
@@ -97,7 +117,8 @@ fun HourHeat(
 
 /**
  * Draws a GPS route as a polyline — the "Strava drawing". Points are normalised into the
- * canvas with the aspect ratio preserved, so the shape is recognisable.
+ * canvas with the aspect ratio preserved, so the shape stays recognisable, and this is the
+ * same composable used for the live drawing while a route is being recorded.
  */
 @Composable
 fun RouteCanvas(
@@ -129,9 +150,15 @@ fun RouteCanvas(
 
         val start = normalised.first()
         val end = normalised.last()
-        drawCircle(color = color, radius = strokeWidth.toPx() * 1.7f,
-            center = Offset(pad + start.first * w, pad + start.second * h))
-        drawCircle(color = Color.White, radius = strokeWidth.toPx() * 0.9f,
-            center = Offset(pad + end.first * w, pad + end.second * h))
+        drawCircle(
+            color = color,
+            radius = strokeWidth.toPx() * 1.7f,
+            center = Offset(pad + start.first * w, pad + start.second * h)
+        )
+        drawCircle(
+            color = Color.White,
+            radius = strokeWidth.toPx() * 0.9f,
+            center = Offset(pad + end.first * w, pad + end.second * h)
+        )
     }
 }

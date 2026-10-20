@@ -1,12 +1,14 @@
 package com.epicmems.stride.ui.screens
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bolt
@@ -25,18 +28,30 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.epicmems.stride.domain.StrideUiState
+import com.epicmems.stride.ui.components.AnimatedDistance
+import com.epicmems.stride.ui.components.AnimatedSteps
 import com.epicmems.stride.ui.components.DarkCard
 import com.epicmems.stride.ui.components.GhostButton
+import com.epicmems.stride.ui.components.Motion
 import com.epicmems.stride.ui.components.PastelCard
 import com.epicmems.stride.ui.components.PrimaryButton
+import com.epicmems.stride.ui.components.ProgressPill
+import com.epicmems.stride.ui.components.RecordingPulse
+import com.epicmems.stride.ui.components.RouteCanvas
+import com.epicmems.stride.ui.components.StatChip
 import com.epicmems.stride.ui.components.StepRing
 import com.epicmems.stride.ui.components.WeekBars
 import com.epicmems.stride.ui.theme.Lime
@@ -56,10 +71,29 @@ fun TodayScreen(
 ) {
     val progress = if (state.goal <= 0) 0f else state.todaySteps.toFloat() / state.goal
 
+    // Screen entrance: fade + a short rise, driven from the draw phase so it costs no
+    // recomposition while it plays.
+    var appeared by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { appeared = true }
+    val enterAlpha = animateFloatAsState(
+        targetValue = if (appeared) 1f else 0f,
+        animationSpec = tween(Motion.BASE, easing = FastOutSlowInEasing),
+        label = "enterAlpha"
+    )
+    val enterOffsetY = animateFloatAsState(
+        targetValue = if (appeared) 0f else 26f,
+        animationSpec = tween(Motion.BASE, easing = FastOutSlowInEasing),
+        label = "enterOffset"
+    )
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            .graphicsLayer {
+                alpha = enterAlpha.value
+                translationY = enterOffsetY.value
+            }
             .padding(20.dp)
     ) {
         // ---- header ----
@@ -92,14 +126,14 @@ fun TodayScreen(
 
         Spacer(Modifier.height(18.dp))
 
-        // ---- hero ----
+        // ---- hero: the counter rolls, the ring and bar ease ----
         PastelCard(color = Pink, modifier = Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(
-                        text = Format.steps(state.todaySteps),
-                        color = OnPastel,
-                        style = MaterialTheme.typography.displayLarge
+                    AnimatedSteps(
+                        value = state.todaySteps,
+                        style = MaterialTheme.typography.displayLarge,
+                        color = OnPastel
                     )
                     Text(
                         text = "of ${Format.steps(state.goal)} steps",
@@ -116,12 +150,22 @@ fun TodayScreen(
                 )
             }
             Spacer(Modifier.height(16.dp))
-            ProgressPill(progress = progress, track = OnPastel.copy(alpha = 0.15f), fill = OnPastel)
+            ProgressPill(
+                progress = progress,
+                track = OnPastel.copy(alpha = 0.15f),
+                fill = OnPastel
+            )
             Spacer(Modifier.height(14.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PastelChip("${(progress * 100).toInt()}% of goal")
                 PastelChip(Format.distance(state.todayDistanceMeters, state.unit))
             }
+        }
+
+        // ---- live route drawing while recording ----
+        if (state.recording.recording) {
+            Spacer(Modifier.height(14.dp))
+            LiveRouteCard(state = state, onStopRoute = onStopRoute)
         }
 
         Spacer(Modifier.height(14.dp))
@@ -152,15 +196,29 @@ fun TodayScreen(
         // ---- route control ----
         if (state.recording.recording) {
             PrimaryButton(
-                text = "Stop route  ·  ${Format.distance(state.recording.distanceMeters, state.unit)}",
+                text = "Stop route",
                 onClick = onStopRoute,
-                leading = { Icon(Icons.Rounded.Stop, contentDescription = null, tint = OnPastel, modifier = Modifier.size(20.dp)) }
+                leading = {
+                    Icon(
+                        Icons.Rounded.Stop,
+                        contentDescription = null,
+                        tint = OnPastel,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             )
         } else {
             PrimaryButton(
                 text = "Start a route",
                 onClick = onStartRoute,
-                leading = { Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = OnPastel, modifier = Modifier.size(20.dp)) }
+                leading = {
+                    Icon(
+                        Icons.Rounded.PlayArrow,
+                        contentDescription = null,
+                        tint = OnPastel,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             )
         }
 
@@ -171,8 +229,8 @@ fun TodayScreen(
                 Text("No step sensor found", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = "This device has no hardware step counter. Stride can still record GPS routes, " +
-                        "but automatic step counting will stay at zero.",
+                    text = "This device has no hardware step counter. Stride can still record GPS " +
+                        "routes, but automatic step counting will stay at zero.",
                     color = TextMuted,
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -196,6 +254,67 @@ fun TodayScreen(
     }
 }
 
+/** The route drawing, updating live as GPS fixes arrive. */
+@Composable
+private fun LiveRouteCard(state: StrideUiState, onStopRoute: () -> Unit) {
+    DarkCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            RecordingPulse(color = Lime)
+            Text("Drawing your route", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = "${state.recording.points.size} pts",
+                color = TextMuted,
+                style = MaterialTheme.typography.labelMedium
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(190.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(Lime.copy(alpha = 0.10f)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (state.recording.points.size < 2) {
+                Text(
+                    text = "Waiting for a GPS fix…",
+                    color = TextMuted,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            } else {
+                RouteCanvas(
+                    points = state.recording.points,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(12.dp),
+                    color = Lime,
+                    strokeWidth = 3.dp
+                )
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        AnimatedDistance(
+            meters = state.recording.distanceMeters,
+            unit = state.unit,
+            style = MaterialTheme.typography.displayMedium,
+            color = Lime
+        )
+
+        Spacer(Modifier.height(10.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatChip(Format.duration(state.recording.durationMillis))
+            StatChip(if (state.recording.points.size < 2) "acquiring GPS" else "recording")
+        }
+    }
+}
+
 @Composable
 private fun InlineStat(icon: ImageVector, value: String, tint: Color) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -215,29 +334,4 @@ private fun PastelChip(text: String) {
         color = OnPastel,
         style = MaterialTheme.typography.labelMedium
     )
-}
-
-@Composable
-fun ProgressPill(
-    progress: Float,
-    track: Color,
-    fill: Color,
-    height: Dp = 12.dp,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(height)
-            .clip(CircleShape)
-            .background(track)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .fillMaxWidth(progress.coerceIn(0f, 1f))
-                .clip(CircleShape)
-                .background(fill)
-        )
-    }
 }

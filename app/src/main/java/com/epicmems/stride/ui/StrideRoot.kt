@@ -1,7 +1,15 @@
 package com.epicmems.stride.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -34,6 +43,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.epicmems.stride.ui.components.Motion
+import com.epicmems.stride.ui.components.pressScale
 import com.epicmems.stride.ui.screens.CalendarScreen
 import com.epicmems.stride.ui.screens.RouteDetailScreen
 import com.epicmems.stride.ui.screens.RoutesScreen
@@ -86,36 +97,53 @@ fun StrideRoot(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            when {
-                detailRouteId >= 0L -> RouteDetailScreen(
+            if (detailRouteId >= 0L) {
+                RouteDetailScreen(
                     routeId = detailRouteId,
                     viewModel = viewModel,
                     onBack = { detailRouteId = -1L }
                 )
+            } else {
+                // Slide + fade between tabs instead of swapping instantly.
+                AnimatedContent(
+                    targetState = tab,
+                    transitionSpec = {
+                        (
+                            fadeIn(animationSpec = tween(Motion.FAST)) +
+                                slideInVertically(
+                                    animationSpec = tween(Motion.BASE),
+                                    initialOffsetY = { fullHeight -> fullHeight / 26 }
+                                )
+                            ) togetherWith fadeOut(animationSpec = tween(Motion.FAST / 2))
+                    },
+                    label = "tabContent"
+                ) { current ->
+                    when (current) {
+                        0 -> TodayScreen(
+                            state = state,
+                            onRequestTrackingPermission = onRequestTrackingPermission,
+                            onStartRoute = onStartRoute,
+                            onStopRoute = onStopRoute
+                        )
 
-                tab == 0 -> TodayScreen(
-                    state = state,
-                    onRequestTrackingPermission = onRequestTrackingPermission,
-                    onStartRoute = onStartRoute,
-                    onStopRoute = onStopRoute
-                )
+                        1 -> RoutesScreen(
+                            state = state,
+                            routePoints = viewModel::routePoints,
+                            onOpenRoute = { detailRouteId = it },
+                            onStartRoute = onStartRoute,
+                            onStopRoute = onStopRoute
+                        )
 
-                tab == 1 -> RoutesScreen(
-                    state = state,
-                    routePoints = viewModel::routePoints,
-                    onOpenRoute = { detailRouteId = it },
-                    onStartRoute = onStartRoute,
-                    onStopRoute = onStopRoute
-                )
+                        2 -> CalendarScreen(
+                            state = state,
+                            onToggleDay = { viewModel.toggleMarked(it) },
+                            onPreviousMonth = { viewModel.previousMonth() },
+                            onNextMonth = { viewModel.nextMonth() }
+                        )
 
-                tab == 2 -> CalendarScreen(
-                    state = state,
-                    onToggleDay = { viewModel.toggleMarked(it) },
-                    onPreviousMonth = { viewModel.previousMonth() },
-                    onNextMonth = { viewModel.nextMonth() }
-                )
-
-                else -> SettingsScreen(state = state, viewModel = viewModel)
+                        else -> SettingsScreen(state = state, viewModel = viewModel)
+                    }
+                }
             }
         }
     }
@@ -140,14 +168,25 @@ private fun StrideBottomBar(
         NavItem(tabs[0], selected == 0) { onSelect(0) }
         NavItem(tabs[1], selected == 1) { onSelect(1) }
 
-        // Floating action: start / stop GPS route recording
+        // Floating action: start / stop GPS route recording.
+        val fabColor by animateColorAsState(
+            targetValue = if (recording) Pink else Lime,
+            animationSpec = tween(Motion.FAST),
+            label = "fabColor"
+        )
+        val fabInteraction = remember { MutableInteractionSource() }
         Box(
             modifier = Modifier
                 .offset(y = (-14).dp)
                 .size(58.dp)
                 .clip(CircleShape)
-                .background(if (recording) Pink else Lime)
-                .clickable(onClick = onToggleRoute),
+                .background(fabColor)
+                .pressScale(fabInteraction, pressedScale = 0.92f)
+                .clickable(
+                    interactionSource = fabInteraction,
+                    indication = null,
+                    onClick = onToggleRoute
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -165,6 +204,11 @@ private fun StrideBottomBar(
 
 @Composable
 private fun NavItem(tab: Tab, active: Boolean, onClick: () -> Unit) {
+    val tint by animateColorAsState(
+        targetValue = if (active) Lime else TextMuted,
+        animationSpec = tween(Motion.FAST),
+        label = "navTint"
+    )
     Column(
         modifier = Modifier
             .clip(CircleShape)
@@ -176,12 +220,12 @@ private fun NavItem(tab: Tab, active: Boolean, onClick: () -> Unit) {
         Icon(
             imageVector = tab.icon,
             contentDescription = tab.label,
-            tint = if (active) Lime else TextMuted,
+            tint = tint,
             modifier = Modifier.size(22.dp)
         )
         Text(
             text = tab.label,
-            color = if (active) Lime else TextMuted,
+            color = tint,
             style = MaterialTheme.typography.labelSmall
         )
     }
