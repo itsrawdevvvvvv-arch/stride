@@ -26,6 +26,7 @@ class SettingsRepository(private val context: Context) {
         val AUTO_ROUTES = booleanPreferencesKey("auto_record_routes")
         val PROFILE_NAME = stringPreferencesKey("profile_name")
         val PROFILE_COLOR = intPreferencesKey("profile_color")
+        val PROFILE_PHOTO = stringPreferencesKey("profile_photo_path")
         val LAST_RAW = floatPreferencesKey("last_raw_counter")
     }
 
@@ -47,6 +48,10 @@ class SettingsRepository(private val context: Context) {
 
     val profileColorIndex: Flow<Int> =
         context.dataStore.data.map { (it[Keys.PROFILE_COLOR] ?: 0).coerceIn(0, 3) }
+
+    /** Absolute path to the copied avatar image, or null when the user hasn't set one. */
+    val profilePhotoPath: Flow<String?> =
+        context.dataStore.data.map { it[Keys.PROFILE_PHOTO] }
 
     suspend fun currentGoal(): Int = dailyGoal.first()
 
@@ -80,6 +85,13 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setProfileColorIndex(value: Int) {
         context.dataStore.edit { it[Keys.PROFILE_COLOR] = value.coerceIn(0, 3) }
+    }
+
+    suspend fun setProfilePhotoPath(value: String?) {
+        context.dataStore.edit { prefs ->
+            if (value.isNullOrBlank()) prefs.remove(Keys.PROFILE_PHOTO)
+            else prefs[Keys.PROFILE_PHOTO] = value
+        }
     }
 
     suspend fun lastRaw(): Float = context.dataStore.data.first()[Keys.LAST_RAW] ?: 0f

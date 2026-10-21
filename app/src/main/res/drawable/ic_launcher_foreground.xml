@@ -1,18 +1,13 @@
+<!--
+  Deliberately empty. The logo lives in the background layer at full bleed so that nothing of
+  it is cut off, and this transparent foreground leaves it completely alone.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#D4F36B"
-        android:pathData="M30,68 h13 v13 h-13 z" />
-    <path
-        android:fillColor="#D4F36B"
-        android:pathData="M47.5,54 h13 v27 h-13 z" />
-    <path
-        android:fillColor="#D4F36B"
-        android:pathData="M65,40 h13 v41 h-13 z" />
-    <path
-        android:fillColor="#F7C3D0"
-        android:pathData="M71.5,26 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 z" />
+        android:fillColor="#00000000"
+        android:pathData="M0,0h108v108h-108z" />
 </vector>

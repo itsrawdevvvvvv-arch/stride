@@ -37,6 +37,7 @@ import com.epicmems.stride.ui.components.AnimatedSteps
 import com.epicmems.stride.ui.components.DarkCard
 import com.epicmems.stride.ui.components.GhostButton
 import com.epicmems.stride.ui.components.PastelCard
+import com.epicmems.stride.ui.components.ProfileAvatar
 import com.epicmems.stride.ui.components.ProgressPill
 import com.epicmems.stride.ui.components.RecordingPulse
 import com.epicmems.stride.ui.components.RouteCanvas
@@ -72,19 +73,12 @@ fun TodayScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(profileColor(state.profileColorIndex)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = Format.initials(state.profileName),
-                    color = OnPastel,
-                    style = MaterialTheme.typography.titleMedium
-                )
-            }
+            ProfileAvatar(
+                name = state.profileName,
+                colorIndex = state.profileColorIndex,
+                photoPath = state.profilePhotoPath,
+                size = 42.dp
+            )
             Text(state.profileName, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.weight(1f))
             InlineStat(Icons.Rounded.LocalFireDepartment, "${state.streak}", Lime)

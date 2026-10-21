@@ -22,6 +22,7 @@ import com.epicmems.stride.track.TrackingState
 import com.epicmems.stride.track.TrackingWatchdogWorker
 import com.epicmems.stride.util.BatteryOptimization
 import com.epicmems.stride.util.Dates
+import com.epicmems.stride.util.ProfileImageStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -38,7 +39,8 @@ private data class ProfileSettings(
     val tracking: Boolean,
     val autoRoutes: Boolean,
     val name: String,
-    val color: Int
+    val color: Int,
+    val photo: String?
 )
 
 private data class SettingsSnapshot(
@@ -48,7 +50,8 @@ private data class SettingsSnapshot(
     val trackingEnabled: Boolean,
     val autoRecordRoutes: Boolean,
     val profileName: String,
-    val profileColorIndex: Int
+    val profileColorIndex: Int,
+    val profilePhotoPath: String?
 )
 
 /**
@@ -96,8 +99,11 @@ class StrideViewModel(private val container: AppContainer) : ViewModel() {
         settings.trackingEnabled,
         settings.autoRecordRoutes,
         settings.profileName,
-        settings.profileColorIndex
-    ) { tracking, auto, name, color -> ProfileSettings(tracking, auto, name, color) }
+        settings.profileColorIndex,
+        settings.profilePhotoPath
+    ) { tracking, auto, name, color, photo ->
+        ProfileSettings(tracking, auto, name, color, photo)
+    }
 
     private val settingsFlow = combine(coreSettingsFlow, profileSettingsFlow) { core, profile ->
         SettingsSnapshot(
@@ -107,7 +113,8 @@ class StrideViewModel(private val container: AppContainer) : ViewModel() {
             trackingEnabled = profile.tracking,
             autoRecordRoutes = profile.autoRoutes,
             profileName = profile.name,
-            profileColorIndex = profile.color
+            profileColorIndex = profile.color,
+            profilePhotoPath = profile.photo
         )
     }
 
@@ -181,7 +188,8 @@ class StrideViewModel(private val container: AppContainer) : ViewModel() {
             batteryExempt = exempt,
             autoRecordRoutes = snapshot.autoRecordRoutes,
             profileName = snapshot.profileName,
-            profileColorIndex = snapshot.profileColorIndex
+            profileColorIndex = snapshot.profileColorIndex,
+            profilePhotoPath = snapshot.profilePhotoPath
         )
     }.stateIn(
         scope = viewModelScope,
@@ -225,6 +233,12 @@ class StrideViewModel(private val container: AppContainer) : ViewModel() {
 
     fun setProfileColorIndex(value: Int) =
         viewModelScope.launch { settings.setProfileColorIndex(value) }
+
+    /** Stores the avatar path; clearing it also deletes the copied file. */
+    fun setProfilePhoto(path: String?) = viewModelScope.launch {
+        settings.setProfilePhotoPath(path)
+        if (path.isNullOrBlank()) ProfileImageStore.clear(container.appContext)
+    }
 
     fun setAutoRecordRoutes(value: Boolean) =
         viewModelScope.launch { settings.setAutoRecordRoutes(value) }

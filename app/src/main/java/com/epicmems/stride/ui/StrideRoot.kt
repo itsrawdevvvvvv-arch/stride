@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.epicmems.stride.ui.components.Motion
+import com.epicmems.stride.ui.components.ProfileAvatar
 import com.epicmems.stride.ui.components.ProfileDialog
 import com.epicmems.stride.ui.components.pressScale
 import com.epicmems.stride.ui.screens.CalendarScreen
@@ -72,9 +73,11 @@ fun StrideRoot(
         ProfileDialog(
             name = state.profileName,
             colorIndex = state.profileColorIndex,
-            onCommit = { name, color ->
+            photoPath = state.profilePhotoPath,
+            onCommit = { name, color, photo ->
                 viewModel.setProfileName(name)
                 viewModel.setProfileColorIndex(color)
+                viewModel.setProfilePhoto(photo)
             },
             onDismiss = { showProfile = false }
         )
@@ -96,6 +99,7 @@ fun StrideRoot(
                     selected = tab,
                     profileName = state.profileName,
                     profileColorIndex = state.profileColorIndex,
+                    profilePhotoPath = state.profilePhotoPath,
                     onSelect = { tab = it },
                     onProfile = { showProfile = true }
                 )
@@ -165,6 +169,7 @@ private fun StrideBottomBar(
     selected: Int,
     profileName: String,
     profileColorIndex: Int,
+    profilePhotoPath: String?,
     onSelect: (Int) -> Unit,
     onProfile: () -> Unit
 ) {
@@ -179,33 +184,22 @@ private fun StrideBottomBar(
         NavItem(tabs[0], selected == 0) { onSelect(0) }
         NavItem(tabs[1], selected == 1) { onSelect(1) }
 
-        // The floating button is now your profile — tap it to edit your name and colour.
-        val fabColor by animateColorAsState(
-            targetValue = profileColor(profileColorIndex),
-            animationSpec = tween(Motion.BASE),
-            label = "fabColor"
-        )
+        // The floating button is your profile — tap it to edit your photo, name and colour.
         val fabInteraction = remember { MutableInteractionSource() }
-        Box(
+        ProfileAvatar(
+            name = profileName,
+            colorIndex = profileColorIndex,
+            photoPath = profilePhotoPath,
+            size = 58.dp,
             modifier = Modifier
                 .offset(y = (-14).dp)
-                .size(58.dp)
-                .clip(CircleShape)
-                .background(fabColor)
                 .pressScale(fabInteraction, pressedScale = 0.92f)
                 .clickable(
                     interactionSource = fabInteraction,
                     indication = null,
                     onClick = onProfile
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = Format.initials(profileName),
-                color = OnPastel,
-                style = MaterialTheme.typography.titleMedium
-            )
-        }
+                )
+        )
 
         NavItem(tabs[2], selected == 2) { onSelect(2) }
         NavItem(tabs[3], selected == 3) { onSelect(3) }

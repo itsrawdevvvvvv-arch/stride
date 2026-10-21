@@ -39,6 +39,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.res.painterResource
+import com.epicmems.stride.R
+import com.epicmems.stride.ui.components.ProfileAvatar
 import com.epicmems.stride.ui.theme.profileColor
 import kotlin.math.roundToInt
 import com.epicmems.stride.data.ExportWriter
@@ -83,7 +88,18 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState())
             .padding(20.dp)
     ) {
-        Text("Settings", color = TextPrimary, style = MaterialTheme.typography.headlineLarge)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // The app's logo, exactly as supplied.
+            Image(
+                painter = painterResource(R.drawable.ic_logo),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+            )
+            Spacer(Modifier.size(12.dp))
+            Text("Settings", color = TextPrimary, style = MaterialTheme.typography.headlineLarge)
+        }
 
         // Pick up a battery-exemption change made in the system dialog.
         LaunchedEffect(Unit) { viewModel.refreshBatteryState() }
@@ -93,19 +109,12 @@ fun SettingsScreen(
         // ---- profile ----
         DarkCard(modifier = Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .clip(CircleShape)
-                        .background(profileColor(state.profileColorIndex)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = Format.initials(state.profileName),
-                        color = OnPastel,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
+                ProfileAvatar(
+                    name = state.profileName,
+                    colorIndex = state.profileColorIndex,
+                    photoPath = state.profilePhotoPath,
+                    size = 52.dp
+                )
                 Spacer(Modifier.size(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(state.profileName, color = TextPrimary, style = MaterialTheme.typography.titleMedium)

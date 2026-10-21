@@ -102,5 +102,7 @@ data class StrideUiState(
     /** Routes are recorded automatically while you move. */
     val autoRecordRoutes: Boolean = true,
     val profileName: String = "Stride",
-    val profileColorIndex: Int = 0
+    val profileColorIndex: Int = 0,
+    /** Path to the copied avatar image, or null when the user uses initials instead. */
+    val profilePhotoPath: String? = null
 )

@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  The supplied logo is used exactly as given: the full image sits in the background layer and
+  is never cropped or recoloured. Android always masks launcher icons to the device's icon
+  shape, but because the artwork's background is a uniform black, that mask only trims black
+  onto black — the mark itself is untouched.
+-->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/ic_launcher_background" />
+    <background android:drawable="@mipmap/ic_launcher_bg" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
 </adaptive-icon>

@@ -1,5 +1,8 @@
 package com.epicmems.stride.ui.components
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,10 +28,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.epicmems.stride.ui.theme.Lime
@@ -38,18 +43,40 @@ import com.epicmems.stride.ui.theme.Surface3
 import com.epicmems.stride.ui.theme.TextMuted
 import com.epicmems.stride.ui.theme.TextPrimary
 import com.epicmems.stride.ui.theme.profileColor
-import com.epicmems.stride.util.Format
+import com.epicmems.stride.util.ProfileImageStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-/** Edit the name and accent colour shown in the app header. */
+/** Edit the profile: photo, name and accent colour. */
 @Composable
 fun ProfileDialog(
     name: String,
     colorIndex: Int,
-    onCommit: (String, Int) -> Unit,
+    photoPath: String?,
+    onCommit: (name: String, colorIndex: Int, photoPath: String?) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     var localName by remember { mutableStateOf(name) }
     var localColor by remember { mutableIntStateOf(colorIndex) }
+    var localPhoto by remember { mutableStateOf(photoPath) }
+    var saving by remember { mutableStateOf(false) }
+
+    val picker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            saving = true
+            scope.launch {
+                val saved = withContext(Dispatchers.IO) { ProfileImageStore.save(context, uri) }
+                if (saved != null) localPhoto = saved
+                saving = false
+            }
+        }
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -64,24 +91,50 @@ fun ProfileDialog(
             Spacer(Modifier.height(18.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(60.dp)
-                        .clip(CircleShape)
-                        .background(profileColor(localColor)),
-                    contentAlignment = Alignment.Center
-                ) {
+                ProfileAvatar(
+                    name = localName,
+                    colorIndex = localColor,
+                    photoPath = localPhoto,
+                    size = 76.dp,
+                    textStyle = MaterialTheme.typography.headlineMedium
+                )
+                Spacer(Modifier.size(16.dp))
+                Column(Modifier.weight(1f)) {
                     Text(
-                        text = Format.initials(localName),
-                        color = OnPastel,
-                        style = MaterialTheme.typography.titleLarge
+                        text = if (localPhoto == null) "No photo yet" else "Looking good",
+                        color = TextPrimary,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = if (saving) "Saving photo…" else "Pick a photo, or just use your initials.",
+                        color = TextMuted,
+                        style = MaterialTheme.typography.bodyMedium
                     )
                 }
-                Spacer(Modifier.size(16.dp))
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            GhostButton(
+                text = if (localPhoto == null) "Choose a photo" else "Change photo",
+                onClick = {
+                    picker.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                }
+            )
+
+            if (localPhoto != null) {
+                Spacer(Modifier.height(10.dp))
                 Text(
-                    text = "This is how Stride greets you.",
+                    text = "Remove photo",
                     color = TextMuted,
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .clip(CircleShape)
+                        .clickable { localPhoto = null }
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
 
@@ -135,7 +188,7 @@ fun ProfileDialog(
             PrimaryButton(
                 text = "Save",
                 onClick = {
-                    onCommit(localName.trim().ifBlank { "Stride" }, localColor)
+                    onCommit(localName.trim().ifBlank { "Stride" }, localColor, localPhoto)
                     onDismiss()
                 }
             )
