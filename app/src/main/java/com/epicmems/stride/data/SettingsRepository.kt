@@ -23,6 +23,9 @@ class SettingsRepository(private val context: Context) {
         val UNIT = stringPreferencesKey("unit")
         val NOTIFICATIONS = booleanPreferencesKey("notifications_enabled")
         val TRACKING_ENABLED = booleanPreferencesKey("tracking_enabled")
+        val AUTO_ROUTES = booleanPreferencesKey("auto_record_routes")
+        val PROFILE_NAME = stringPreferencesKey("profile_name")
+        val PROFILE_COLOR = intPreferencesKey("profile_color")
         val LAST_RAW = floatPreferencesKey("last_raw_counter")
     }
 
@@ -35,9 +38,21 @@ class SettingsRepository(private val context: Context) {
     val trackingEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[Keys.TRACKING_ENABLED] ?: true }
 
+    /** Record routes automatically as you move, with no start/stop. */
+    val autoRecordRoutes: Flow<Boolean> =
+        context.dataStore.data.map { it[Keys.AUTO_ROUTES] ?: true }
+
+    val profileName: Flow<String> =
+        context.dataStore.data.map { it[Keys.PROFILE_NAME] ?: DEFAULT_NAME }
+
+    val profileColorIndex: Flow<Int> =
+        context.dataStore.data.map { (it[Keys.PROFILE_COLOR] ?: 0).coerceIn(0, 3) }
+
     suspend fun currentGoal(): Int = dailyGoal.first()
 
     suspend fun isTrackingEnabled(): Boolean = trackingEnabled.first()
+
+    suspend fun isAutoRecordEnabled(): Boolean = autoRecordRoutes.first()
 
     suspend fun setDailyGoal(value: Int) {
         context.dataStore.edit { it[Keys.DAILY_GOAL] = value.coerceIn(1_000, 50_000) }
@@ -55,6 +70,18 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.edit { it[Keys.TRACKING_ENABLED] = value }
     }
 
+    suspend fun setAutoRecordRoutes(value: Boolean) {
+        context.dataStore.edit { it[Keys.AUTO_ROUTES] = value }
+    }
+
+    suspend fun setProfileName(value: String) {
+        context.dataStore.edit { it[Keys.PROFILE_NAME] = value.trim().take(24) }
+    }
+
+    suspend fun setProfileColorIndex(value: Int) {
+        context.dataStore.edit { it[Keys.PROFILE_COLOR] = value.coerceIn(0, 3) }
+    }
+
     suspend fun lastRaw(): Float = context.dataStore.data.first()[Keys.LAST_RAW] ?: 0f
 
     suspend fun setLastRaw(value: Float) {
@@ -63,5 +90,6 @@ class SettingsRepository(private val context: Context) {
 
     companion object {
         const val DEFAULT_GOAL = 8000
+        const val DEFAULT_NAME = "Stride"
     }
 }

@@ -32,18 +32,30 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
+private data class CoreSettings(val goal: Int, val unit: String, val notifications: Boolean)
+
+private data class ProfileSettings(
+    val tracking: Boolean,
+    val autoRoutes: Boolean,
+    val name: String,
+    val color: Int
+)
+
 private data class SettingsSnapshot(
     val goal: Int,
     val unit: String,
     val notifications: Boolean,
-    val trackingEnabled: Boolean
+    val trackingEnabled: Boolean,
+    val autoRecordRoutes: Boolean,
+    val profileName: String,
+    val profileColorIndex: Int
 )
 
 /**
- * Everything derived from the stored days. Kept in its own snapshot so that
- * [StrideViewModel.statsFlow] can suppress re-emission with `distinctUntilChanged` — that
- * keeps the *same list instances* flowing while a route is recording, which lets Compose skip
- * the charts and stat cards entirely instead of rebuilding them every second.
+ * Everything derived from the stored days. Kept in its own snapshot so that [statsFlow] can
+ * suppress re-emission with `distinctUntilChanged` — that keeps the *same list instances*
+ * flowing while a route is recording, which lets Compose skip the charts and stat cards
+ * instead of rebuilding them every second.
  */
 private data class StatsSnapshot(
     val month: LocalDate,
@@ -76,28 +88,51 @@ class StrideViewModel(private val container: AppContainer) : ViewModel() {
     private val todayKey: String = Dates.key(today)
     private val selectedMonth = MutableStateFlow(today.withDayOfMonth(1))
 
-    private val settingsFlow = combine(
-        settings.dailyGoal, settings.unit, settings.notificationsEnabled, settings.trackingEnabled
-    ) { goal, unit, notifications, tracking ->
-        SettingsSnapshot(goal, unit, notifications, tracking)
+    private val coreSettingsFlow = combine(
+        settings.dailyGoal, settings.unit, settings.notificationsEnabled
+    ) { goal, unit, notifications -> CoreSettings(goal, unit, notifications) }
+
+    private val profileSettingsFlow = combine(
+        settings.trackingEnabled,
+        settings.autoRecordRoutes,
+        settings.profileName,
+        settings.profileColorIndex
+    ) { tracking, auto, name, color -> ProfileSettings(tracking, auto, name, color) }
+
+    private val settingsFlow = combine(coreSettingsFlow, profileSettingsFlow) { core, profile ->
+        SettingsSnapshot(
+            goal = core.goal,
+            unit = core.unit,
+            notifications = core.notifications,
+            trackingEnabled = profile.tracking,
+            autoRecordRoutes = profile.autoRoutes,
+            profileName = profile.name,
+            profileColorIndex = profile.color
+        )
     }
 
     /** Refreshed from the Settings screen — reading it on every emission would hit the system service. */
     private val batteryExempt = MutableStateFlow(BatteryOptimization.isExempt(container.appContext))
 
     private val trackingFlow = combine(
-        TrackingState.recording,
-        TrackingState.distanceMeters,
-        TrackingState.durationMillis,
-        TrackingState.points,
-        TrackingState.status
-    ) { recording, distance, duration, points, status ->
+        combine(
+            TrackingState.recording,
+            TrackingState.distanceMeters,
+            TrackingState.durationMillis
+        ) { recording, distance, duration -> Triple(recording, distance, duration) },
+        combine(
+            TrackingState.points,
+            TrackingState.status,
+            TrackingState.estimated
+        ) { points, status, estimated -> Triple(points, status, estimated) }
+    ) { a, b ->
         RecordingState(
-            recording = recording,
-            distanceMeters = distance,
-            durationMillis = duration,
-            points = points,
-            status = status
+            recording = a.first,
+            distanceMeters = a.second,
+            durationMillis = a.third,
+            points = b.first,
+            status = b.second,
+            estimated = b.third
         )
     }
 
@@ -143,7 +178,10 @@ class StrideViewModel(private val container: AppContainer) : ViewModel() {
             routes = volatile.routes,
             recording = volatile.recording,
             trackingEnabled = snapshot.trackingEnabled,
-            batteryExempt = exempt
+            batteryExempt = exempt,
+            autoRecordRoutes = snapshot.autoRecordRoutes,
+            profileName = snapshot.profileName,
+            profileColorIndex = snapshot.profileColorIndex
         )
     }.stateIn(
         scope = viewModelScope,
@@ -182,6 +220,14 @@ class StrideViewModel(private val container: AppContainer) : ViewModel() {
 
     fun setNotificationsEnabled(value: Boolean) =
         viewModelScope.launch { settings.setNotificationsEnabled(value) }
+
+    fun setProfileName(value: String) = viewModelScope.launch { settings.setProfileName(value) }
+
+    fun setProfileColorIndex(value: Int) =
+        viewModelScope.launch { settings.setProfileColorIndex(value) }
+
+    fun setAutoRecordRoutes(value: Boolean) =
+        viewModelScope.launch { settings.setAutoRecordRoutes(value) }
 
     /** Turns always-on tracking on or off: the service plus its watchdog. */
     fun setTrackingEnabled(enabled: Boolean) = viewModelScope.launch {
@@ -223,7 +269,8 @@ class StrideViewModel(private val container: AppContainer) : ViewModel() {
 
     fun deleteRoute(id: Long) = viewModelScope.launch { routeRepository.deleteRoute(id) }
 
-    fun routePoints(routeId: Long): Flow<List<RoutePointEntity>> = routeRepository.observePoints(routeId)
+    fun routePoints(routeId: Long): Flow<List<RoutePointEntity>> =
+        routeRepository.observePoints(routeId)
 
     // ---- exports (suspend so the caller can write to the chosen document) ----
 

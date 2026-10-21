@@ -20,3 +20,11 @@ val Pink = Color(0xFFF7C3D0)
 val Peri = Color(0xFFC6C9F2)
 val Mint = Color(0xFFA9E5CF)
 val OnPastel = Color(0xFF1A1A1A)
+
+/** The pastel accents offered for the profile avatar. */
+fun profileColor(index: Int): Color = when (index) {
+    1 -> Lime
+    2 -> Peri
+    3 -> Mint
+    else -> Pink
+}

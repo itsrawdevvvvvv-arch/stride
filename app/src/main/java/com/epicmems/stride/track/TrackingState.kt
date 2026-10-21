@@ -6,8 +6,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
  * In-memory state of the route recorder, so the UI can draw the route as it is being walked
- * without re-reading the database on every GPS fix. The ViewModel combines these flows into
- * the state the screens render.
+ * without re-reading the database on every point. The ViewModel combines these flows into the
+ * state the screens render.
  */
 object TrackingState {
 
@@ -17,11 +17,15 @@ object TrackingState {
     val points = MutableStateFlow<List<LatLng>>(emptyList())
     val status = MutableStateFlow(RecordingStatus.IDLE)
 
+    /** True while the path is being reconstructed from motion sensors (indoors, no GPS). */
+    val estimated = MutableStateFlow(false)
+
     fun reset() {
         recording.value = false
         distanceMeters.value = 0.0
         durationMillis.value = 0L
         points.value = emptyList()
         status.value = RecordingStatus.IDLE
+        estimated.value = false
     }
 }

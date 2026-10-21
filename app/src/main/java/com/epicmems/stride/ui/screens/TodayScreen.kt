@@ -19,8 +19,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.LocalFireDepartment
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -39,7 +37,6 @@ import com.epicmems.stride.ui.components.AnimatedSteps
 import com.epicmems.stride.ui.components.DarkCard
 import com.epicmems.stride.ui.components.GhostButton
 import com.epicmems.stride.ui.components.PastelCard
-import com.epicmems.stride.ui.components.PrimaryButton
 import com.epicmems.stride.ui.components.ProgressPill
 import com.epicmems.stride.ui.components.RecordingPulse
 import com.epicmems.stride.ui.components.RouteCanvas
@@ -54,14 +51,13 @@ import com.epicmems.stride.ui.theme.Pink
 import com.epicmems.stride.ui.theme.Surface3
 import com.epicmems.stride.ui.theme.TextMuted
 import com.epicmems.stride.ui.theme.TextPrimary
+import com.epicmems.stride.ui.theme.profileColor
 import com.epicmems.stride.util.Format
 
 @Composable
 fun TodayScreen(
     state: StrideUiState,
-    onRequestTrackingPermission: () -> Unit,
-    onStartRoute: () -> Unit,
-    onStopRoute: () -> Unit
+    onRequestTrackingPermission: () -> Unit
 ) {
     val progress = if (state.goal <= 0) 0f else state.todaySteps.toFloat() / state.goal
 
@@ -80,12 +76,16 @@ fun TodayScreen(
                 modifier = Modifier
                     .size(42.dp)
                     .clip(CircleShape)
-                    .background(Pink),
+                    .background(profileColor(state.profileColorIndex)),
                 contentAlignment = Alignment.Center
             ) {
-                Text("EM", color = OnPastel, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = Format.initials(state.profileName),
+                    color = OnPastel,
+                    style = MaterialTheme.typography.titleMedium
+                )
             }
-            Text("Stride", color = TextPrimary, style = MaterialTheme.typography.titleLarge)
+            Text(state.profileName, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.weight(1f))
             InlineStat(Icons.Rounded.LocalFireDepartment, "${state.streak}", Lime)
             Spacer(Modifier.width(12.dp))
@@ -137,10 +137,10 @@ fun TodayScreen(
             }
         }
 
-        // ---- live route drawing while recording ----
+        // ---- the route being drawn right now (fully automatic) ----
         if (state.recording.recording) {
             Spacer(Modifier.height(14.dp))
-            LiveRouteCard(state = state, onStopRoute = onStopRoute)
+            LiveRouteCard(state = state)
         }
 
         Spacer(Modifier.height(14.dp))
@@ -168,32 +168,24 @@ fun TodayScreen(
 
         Spacer(Modifier.height(14.dp))
 
-        // ---- route control ----
-        if (state.recording.recording) {
-            PrimaryButton(
-                text = "Stop route",
-                onClick = onStopRoute,
-                leading = {
-                    Icon(
-                        Icons.Rounded.Stop,
-                        contentDescription = null,
-                        tint = OnPastel,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+        // ---- how recording works now ----
+        DarkCard(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = if (state.autoRecordRoutes) "Recording on its own" else "Auto-recording is off",
+                color = TextPrimary,
+                style = MaterialTheme.typography.titleMedium
             )
-        } else {
-            PrimaryButton(
-                text = "Start a route",
-                onClick = onStartRoute,
-                leading = {
-                    Icon(
-                        Icons.Rounded.PlayArrow,
-                        contentDescription = null,
-                        tint = OnPastel,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = if (state.autoRecordRoutes) {
+                    "There is nothing to press. Stride notices when you start moving, draws the " +
+                        "path, and saves it against the day. Indoors, where GPS can't reach, the " +
+                        "path is estimated from your steps and direction."
+                } else {
+                    "Turn auto-recording back on in Settings if you want your walks saved again."
+                },
+                color = TextMuted,
+                style = MaterialTheme.typography.bodyMedium
             )
         }
 
@@ -204,8 +196,8 @@ fun TodayScreen(
                 Text("No step sensor found", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = "This device has no hardware step counter. Stride can still record GPS " +
-                        "routes, but automatic step counting will stay at zero.",
+                    text = "This device has no hardware step counter, so step counting and the " +
+                        "indoor path estimate will stay empty.",
                     color = TextMuted,
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -218,7 +210,8 @@ fun TodayScreen(
                 Spacer(Modifier.height(6.dp))
                 Text(
                     text = "Put the phone in your pocket and walk. Stride counts steps in the " +
-                        "background using the hardware step counter — no GPS needed for counting.",
+                        "background and records your route by itself — indoors it estimates the " +
+                        "path from your steps and direction.",
                     color = TextMuted,
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -229,11 +222,16 @@ fun TodayScreen(
     }
 }
 
-/** The route drawing, updating live as GPS fixes arrive — with a visible status when it can't. */
+/** The route drawing, updating live as you move. */
 @Composable
-private fun LiveRouteCard(state: StrideUiState, onStopRoute: () -> Unit) {
+private fun LiveRouteCard(state: StrideUiState) {
     val recording = state.recording
     val hint = recordingStatusHint(recording.status)
+    val label = if (recording.estimated) {
+        "Estimated path (no GPS)"
+    } else {
+        recordingStatusLabel(recording.status)
+    }
 
     DarkCard(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -243,11 +241,7 @@ private fun LiveRouteCard(state: StrideUiState, onStopRoute: () -> Unit) {
             RecordingPulse(
                 color = if (recording.status == RecordingStatus.TRACKING) Lime else Pink
             )
-            Text(
-                text = recordingStatusLabel(recording.status),
-                color = TextPrimary,
-                style = MaterialTheme.typography.titleMedium
-            )
+            Text(label, color = TextPrimary, style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.weight(1f))
             Text(
                 text = "${recording.points.size} pts",
@@ -312,7 +306,17 @@ private fun LiveRouteCard(state: StrideUiState, onStopRoute: () -> Unit) {
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             StatChip(Format.duration(recording.durationMillis))
-            StatChip(if (recording.status == RecordingStatus.TRACKING) "recording" else "acquiring")
+            StatChip(if (recording.estimated) "estimated" else "GPS")
+        }
+
+        if (recording.estimated) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = "GPS needs a clear view of the sky, so indoors the shape is rebuilt from " +
+                    "your steps and compass heading. It's a good record of the walk, not a survey.",
+                color = TextMuted.copy(alpha = 0.85f),
+                style = MaterialTheme.typography.bodyMedium
+            )
         }
     }
 }

@@ -46,7 +46,7 @@ data class DayStat(
     val completed: Boolean get() = goalHit || marked
 }
 
-/** Summary of a recorded GPS route. */
+/** Summary of a recorded route segment. */
 @Immutable
 data class RouteSummary(
     val id: Long,
@@ -54,7 +54,9 @@ data class RouteSummary(
     val endTime: Long,
     val distanceMeters: Double,
     val durationMillis: Long,
-    val pointCount: Int
+    val pointCount: Int,
+    /** True when the path was estimated from motion sensors because GPS was unavailable. */
+    val estimated: Boolean = false
 )
 
 /** Live state of the route recorder, exposed to the UI. */
@@ -64,7 +66,9 @@ data class RecordingState(
     val distanceMeters: Double = 0.0,
     val durationMillis: Long = 0L,
     val points: List<LatLng> = emptyList(),
-    val status: RecordingStatus = RecordingStatus.IDLE
+    val status: RecordingStatus = RecordingStatus.IDLE,
+    /** True while the path is being reconstructed from motion sensors (indoors, no GPS). */
+    val estimated: Boolean = false
 )
 
 /** Everything the screens render. */
@@ -94,5 +98,9 @@ data class StrideUiState(
     /** Always-on tracking preference. */
     val trackingEnabled: Boolean = true,
     /** Whether the system has exempted Stride from battery optimisation. */
-    val batteryExempt: Boolean = false
+    val batteryExempt: Boolean = false,
+    /** Routes are recorded automatically while you move. */
+    val autoRecordRoutes: Boolean = true,
+    val profileName: String = "Stride",
+    val profileColorIndex: Int = 0
 )

@@ -24,7 +24,7 @@ interface RouteDao {
     @Query("SELECT * FROM routes ORDER BY startTime DESC")
     suspend fun routes(): List<RouteEntity>
 
-    @Query("SELECT * FROM routes ORDER BY startTime DESC")
+    @Query("SELECT * FROM routes WHERE pointCount > 0 ORDER BY startTime DESC")
     fun observeRoutes(): Flow<List<RouteEntity>>
 
     @Query("SELECT * FROM route_points WHERE routeId = :id ORDER BY seq ASC")
@@ -42,12 +42,9 @@ interface RouteDao {
     @Query("DELETE FROM routes WHERE id = :id")
     suspend fun deleteRouteById(id: Long)
 
-    @Query("SELECT COUNT(*) FROM routes")
-    suspend fun count(): Int
+    @Query("DELETE FROM routes")
+    suspend fun clearRoutes()
 
     @Query("DELETE FROM route_points")
     suspend fun clearPoints()
-
-    @Query("DELETE FROM routes")
-    suspend fun clearRoutes()
 }

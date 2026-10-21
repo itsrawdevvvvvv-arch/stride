@@ -24,9 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Map
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -44,6 +42,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.epicmems.stride.ui.components.Motion
+import com.epicmems.stride.ui.components.ProfileDialog
 import com.epicmems.stride.ui.components.pressScale
 import com.epicmems.stride.ui.screens.CalendarScreen
 import com.epicmems.stride.ui.screens.RouteDetailScreen
@@ -53,21 +52,33 @@ import com.epicmems.stride.ui.screens.TodayScreen
 import com.epicmems.stride.ui.theme.Bg
 import com.epicmems.stride.ui.theme.Lime
 import com.epicmems.stride.ui.theme.OnPastel
-import com.epicmems.stride.ui.theme.Pink
 import com.epicmems.stride.ui.theme.TextMuted
+import com.epicmems.stride.ui.theme.profileColor
+import com.epicmems.stride.util.Format
 
 private data class Tab(val label: String, val icon: ImageVector)
 
 @Composable
 fun StrideRoot(
     viewModel: StrideViewModel,
-    onStartRoute: () -> Unit,
-    onStopRoute: () -> Unit,
     onRequestTrackingPermission: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(0) }
     var detailRouteId by rememberSaveable { mutableStateOf(-1L) }
+    var showProfile by rememberSaveable { mutableStateOf(false) }
+
+    if (showProfile) {
+        ProfileDialog(
+            name = state.profileName,
+            colorIndex = state.profileColorIndex,
+            onCommit = { name, color ->
+                viewModel.setProfileName(name)
+                viewModel.setProfileColorIndex(color)
+            },
+            onDismiss = { showProfile = false }
+        )
+    }
 
     val tabs = listOf(
         Tab("Today", Icons.Rounded.Home),
@@ -83,11 +94,10 @@ fun StrideRoot(
                 StrideBottomBar(
                     tabs = tabs,
                     selected = tab,
-                    recording = state.recording.recording,
+                    profileName = state.profileName,
+                    profileColorIndex = state.profileColorIndex,
                     onSelect = { tab = it },
-                    onToggleRoute = {
-                        if (state.recording.recording) onStopRoute() else onStartRoute()
-                    }
+                    onProfile = { showProfile = true }
                 )
             }
         }
@@ -121,17 +131,13 @@ fun StrideRoot(
                     when (current) {
                         0 -> TodayScreen(
                             state = state,
-                            onRequestTrackingPermission = onRequestTrackingPermission,
-                            onStartRoute = onStartRoute,
-                            onStopRoute = onStopRoute
+                            onRequestTrackingPermission = onRequestTrackingPermission
                         )
 
                         1 -> RoutesScreen(
                             state = state,
                             routePoints = viewModel::routePoints,
-                            onOpenRoute = { detailRouteId = it },
-                            onStartRoute = onStartRoute,
-                            onStopRoute = onStopRoute
+                            onOpenRoute = { detailRouteId = it }
                         )
 
                         2 -> CalendarScreen(
@@ -141,7 +147,11 @@ fun StrideRoot(
                             onNextMonth = { viewModel.nextMonth() }
                         )
 
-                        else -> SettingsScreen(state = state, viewModel = viewModel)
+                        else -> SettingsScreen(
+                            state = state,
+                            viewModel = viewModel,
+                            onEditProfile = { showProfile = true }
+                        )
                     }
                 }
             }
@@ -153,9 +163,10 @@ fun StrideRoot(
 private fun StrideBottomBar(
     tabs: List<Tab>,
     selected: Int,
-    recording: Boolean,
+    profileName: String,
+    profileColorIndex: Int,
     onSelect: (Int) -> Unit,
-    onToggleRoute: () -> Unit
+    onProfile: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -168,10 +179,10 @@ private fun StrideBottomBar(
         NavItem(tabs[0], selected == 0) { onSelect(0) }
         NavItem(tabs[1], selected == 1) { onSelect(1) }
 
-        // Floating action: start / stop GPS route recording.
+        // The floating button is now your profile — tap it to edit your name and colour.
         val fabColor by animateColorAsState(
-            targetValue = if (recording) Pink else Lime,
-            animationSpec = tween(Motion.FAST),
+            targetValue = profileColor(profileColorIndex),
+            animationSpec = tween(Motion.BASE),
             label = "fabColor"
         )
         val fabInteraction = remember { MutableInteractionSource() }
@@ -185,15 +196,14 @@ private fun StrideBottomBar(
                 .clickable(
                     interactionSource = fabInteraction,
                     indication = null,
-                    onClick = onToggleRoute
+                    onClick = onProfile
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = if (recording) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
-                contentDescription = if (recording) "Stop route" else "Start route",
-                tint = OnPastel,
-                modifier = Modifier.size(28.dp)
+            Text(
+                text = Format.initials(profileName),
+                color = OnPastel,
+                style = MaterialTheme.typography.titleMedium
             )
         }
 

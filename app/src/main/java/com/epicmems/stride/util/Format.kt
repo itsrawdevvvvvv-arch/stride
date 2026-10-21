@@ -35,4 +35,14 @@ object Format {
     }
 
     fun percent(value: Float): String = "${(value * 100).toInt()}%"
+
+    /** "Epic Mems" -> "EM"; "Stride" -> "ST". */
+    fun initials(name: String): String {
+        val parts = name.trim().split(' ').filter { it.isNotEmpty() }
+        return when {
+            parts.isEmpty() -> "S"
+            parts.size == 1 -> parts[0].take(2).uppercase(Locale.US)
+            else -> (parts[0].take(1) + parts[1].take(1)).uppercase(Locale.US)
+        }
+    }
 }

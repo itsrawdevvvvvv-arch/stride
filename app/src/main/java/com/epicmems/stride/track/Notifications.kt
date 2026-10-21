@@ -78,10 +78,18 @@ object Notifications {
             .build()
     }
 
-    fun routeNotification(context: Context, distanceLabel: String, durationLabel: String): Notification =
+    fun routeNotification(
+        context: Context,
+        distanceLabel: String,
+        durationLabel: String,
+        estimated: Boolean = false
+    ): Notification =
         NotificationCompat.Builder(context, CHANNEL_ROUTES)
             .setContentTitle(context.getString(R.string.notif_route_title))
-            .setContentText("$distanceLabel · $durationLabel")
+            .setContentText(
+                if (estimated) "$distanceLabel · $durationLabel · estimated (no GPS)"
+                else "$distanceLabel · $durationLabel"
+            )
             .setSmallIcon(R.drawable.ic_stat_stride)
             .setContentIntent(contentIntent(context))
             .addAction(0, context.getString(R.string.notif_stop), stopIntent(context, RouteTrackingService::class.java))

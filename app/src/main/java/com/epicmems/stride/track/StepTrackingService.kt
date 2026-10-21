@@ -27,33 +27,26 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Keeps the step sensor registered and shows a permanent, ongoing notification with today's
- * count.
+ * Keeps the step sensor registered, shows a permanent ongoing notification with today's count,
+ * and — because there is no start/stop button any more — decides when to record a route.
  *
- * Surviving "the user closed the app" is deliberate and layered:
- *  - the manifest declares `android:stopWithTask="false"`, so swiping Stride out of Recents
- *    does **not** stop this service;
- *  - [onTaskRemoved] re-registers the sensor and re-posts the notification anyway;
- *  - `START_STICKY` asks the system to restart us after a low-memory kill;
- *  - [TrackingWatchdogWorker] re-starts us every 15 minutes if an aggressive OEM build
- *    killed us regardless;
- *  - [BootReceiver] brings us back after a reboot.
- *
- * The one thing nothing can survive is the user tapping **Force stop** — Android disables the
- * app until it is launched again, by design.
+ * Route recording is driven purely by movement: a step in the last [MOVING_WINDOW_MS] means
+ * "walking, record", and [STOP_WINDOW_MS] without a step means "stopped, close the segment".
+ * Each segment is saved against the day it happened, and the day rolling over closes it too.
  */
 class StepTrackingService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var engine: StepSensorEngine
     private var widgetJob: Job? = null
+    private var watcherJob: Job? = null
     private var lastSteps = 0
+    private var lastMovementAt = 0L
+    private var lastDayKey = ""
 
     override fun onCreate() {
         super.onCreate()
 
-        // Without activity-recognition permission there is no step data, and on Android 14
-        // starting a health-type foreground service without it throws. Stop cleanly instead.
         if (!hasActivityPermission(this)) {
             stopSelf()
             return
@@ -66,27 +59,67 @@ class StepTrackingService : Service() {
         startInForeground(lastSteps)
         engine.start()
 
+        lastDayKey = Dates.key(Dates.today())
+
         scope.launch {
             container.stepRepository.observeDay(Dates.key(Dates.today()))
                 .collectLatest { day ->
                     val steps = day?.steps ?: 0
+                    if (steps > lastSteps) lastMovementAt = System.currentTimeMillis()
                     lastSteps = steps
                     updateNotification(steps)
                 }
         }
 
-        // Keep the home-screen widget reasonably fresh while tracking is alive.
         widgetJob = scope.launch {
             while (isActive) {
                 runCatching { WidgetUpdater.updateAll(this@StepTrackingService) }
                 delay(60_000L)
             }
         }
+
+        watcherJob = scope.launch {
+            while (isActive) {
+                delay(20_000L)
+                runCatching { superviseRouteRecording() }
+            }
+        }
+    }
+
+    /**
+     * Starts and stops the route recorder based on whether the user is actually moving.
+     * This is what replaced the start/stop buttons.
+     */
+    private suspend fun superviseRouteRecording() {
+        val container = (application as StrideApp).container
+        val auto = runCatching { container.settingsRepository.isAutoRecordEnabled() }.getOrDefault(true)
+        val now = System.currentTimeMillis()
+        val recording = TrackingState.recording.value
+
+        // A new day closes whatever was running so segments stay grouped per day.
+        val dayKey = Dates.key(Dates.today())
+        if (dayKey != lastDayKey) {
+            lastDayKey = dayKey
+            if (recording) RouteTrackingService.stop(this)
+            return
+        }
+
+        if (!auto) {
+            if (recording) RouteTrackingService.stop(this)
+            return
+        }
+
+        val movedRecently = now - lastMovementAt < MOVING_WINDOW_MS
+        val stillForAges = now - lastMovementAt > STOP_WINDOW_MS
+
+        if (movedRecently && !recording) {
+            RouteTrackingService.start(this)
+        } else if (recording && stillForAges) {
+            RouteTrackingService.stop(this)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Called again when the system restarts us (START_STICKY) or the watchdog pokes us.
-        // Make sure we are actually working and visible.
         engine.start()
         startInForeground(lastSteps)
         return START_STICKY
@@ -94,10 +127,6 @@ class StepTrackingService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    /**
-     * The user swiped Stride out of Recents. Counting must not stop: re-register the sensor
-     * and re-post the ongoing notification in case it had been dismissed.
-     */
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
         Log.i(TAG, "task removed — keeping tracking alive")
@@ -138,14 +167,16 @@ class StepTrackingService : Service() {
     companion object {
         private const val TAG = "StepTrackingService"
 
+        /** A step within this window counts as "currently walking". */
+        private const val MOVING_WINDOW_MS = 60_000L
+
+        /** No step for this long closes the current route segment. */
+        private const val STOP_WINDOW_MS = 180_000L
+
         fun hasActivityPermission(context: Context): Boolean =
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) ==
                 PackageManager.PERMISSION_GRANTED
 
-        /**
-         * Safe to call from anywhere — including the background and from the watchdog.
-         * Never throws: a refused background start simply means we try again later.
-         */
         fun start(context: Context) {
             if (!hasActivityPermission(context)) return
             runCatching {

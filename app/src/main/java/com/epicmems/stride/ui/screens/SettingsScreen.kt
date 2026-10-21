@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.epicmems.stride.ui.theme.profileColor
 import kotlin.math.roundToInt
 import com.epicmems.stride.data.ExportWriter
 import com.epicmems.stride.domain.StrideUiState
@@ -57,7 +58,11 @@ import com.epicmems.stride.util.Format
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsScreen(state: StrideUiState, viewModel: StrideViewModel) {
+fun SettingsScreen(
+    state: StrideUiState,
+    viewModel: StrideViewModel,
+    onEditProfile: () -> Unit
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -84,6 +89,46 @@ fun SettingsScreen(state: StrideUiState, viewModel: StrideViewModel) {
         LaunchedEffect(Unit) { viewModel.refreshBatteryState() }
 
         Spacer(Modifier.height(18.dp))
+
+        // ---- profile ----
+        DarkCard(modifier = Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(profileColor(state.profileColorIndex)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = Format.initials(state.profileName),
+                        color = OnPastel,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+                Spacer(Modifier.size(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(state.profileName, color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = "Your name and accent colour",
+                        color = TextMuted,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                Text(
+                    text = "Edit",
+                    color = Lime,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(Surface3)
+                        .clickable(onClick = onEditProfile)
+                        .padding(horizontal = 18.dp, vertical = 10.dp)
+                )
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
 
         // ---- daily goal ----
         DarkCard(modifier = Modifier.fillMaxWidth()) {
@@ -181,6 +226,39 @@ fun SettingsScreen(state: StrideUiState, viewModel: StrideViewModel) {
                 Switch(
                     checked = state.trackingEnabled,
                     onCheckedChange = { viewModel.setTrackingEnabled(it) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = OnPastel,
+                        checkedTrackColor = Lime,
+                        uncheckedThumbColor = TextMuted,
+                        uncheckedTrackColor = Surface3
+                    )
+                )
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        // ---- auto route recording ----
+        DarkCard(modifier = Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = "Record routes automatically",
+                        color = TextPrimary,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "No start or stop — the path is drawn whenever you move and saved " +
+                            "against the day. Indoors it is estimated from your steps.",
+                        color = TextMuted,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                Spacer(Modifier.size(12.dp))
+                Switch(
+                    checked = state.autoRecordRoutes,
+                    onCheckedChange = { viewModel.setAutoRecordRoutes(it) },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = OnPastel,
                         checkedTrackColor = Lime,
