@@ -20,6 +20,9 @@ class RouteRepository(private val dao: RouteDao) {
 
     suspend fun routes(): List<RouteEntity> = dao.routes()
 
+    /** Domain summaries — what the exporters and the UI work with. */
+    suspend fun routeSummaries(): List<RouteSummary> = dao.routes().map { it.toSummary() }
+
     suspend fun points(routeId: Long): List<RoutePointEntity> = dao.points(routeId)
 
     suspend fun allPoints(): List<RoutePointEntity> = dao.allPoints()
@@ -67,11 +70,21 @@ class RouteRepository(private val dao: RouteDao) {
     }
 
     suspend fun loadSampleRoutes() {
-        val (routes, points) = SampleData.routes()
-        routes.forEachIndexed { index, route ->
+        // SampleData gives one entry per route: the row plus its path as plain coordinates.
+        SampleData.routes().forEach { (route, path) ->
             val id = dao.insertRoute(route.copy(id = 0))
-            dao.insertPoints(points.filter { it.routeId == route.id }.map { it.copy(routeId = id) })
-            if (index < 0) return@forEachIndexed
+            dao.insertPoints(
+                path.mapIndexed { index, point ->
+                    RoutePointEntity(
+                        routeId = id,
+                        seq = index,
+                        lat = point.lat,
+                        lng = point.lng,
+                        time = route.startTime + index * 1_000L,
+                        accuracy = 0f
+                    )
+                }
+            )
         }
     }
 

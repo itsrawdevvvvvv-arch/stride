@@ -169,7 +169,7 @@ class RouteTrackingService : Service() {
 
         TrackingState.points.value = emptyList()
         TrackingState.distanceMeters.value = 0.0
-        TrackingState.durationMillis.value = 0.0
+        TrackingState.durationMillis.value = 0L
         TrackingState.recording.value = true
         TrackingState.estimated.value = estimated
         TrackingState.status.value = RecordingStatus.TRACKING
@@ -203,7 +203,7 @@ class RouteTrackingService : Service() {
         Log.i(TAG, "closing segment $id ($count points, estimated=$wasEstimated)")
         return ioScope.launch {
             runCatching {
-                if (points.isNotEmpty()) repository.appendPoints(points.map { it.toEntity(id) })
+                if (points.isNotEmpty()) repository.appendPoints(id, points.map { it.toEntity(id) })
                 if (count >= MIN_POINTS) {
                     repository.finishRoute(id, end, total, count)
                 } else {
@@ -277,7 +277,7 @@ class RouteTrackingService : Service() {
         if (id == 0L || buffer.isEmpty()) return
         val batch = buffer.map { it.toEntity(id) }
         buffer = mutableListOf()
-        ioScope.launch { runCatching { repository.appendPoints(batch) } }
+        ioScope.launch { runCatching { repository.appendPoints(id, batch) } }
         updateNotification()
     }
 

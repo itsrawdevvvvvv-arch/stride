@@ -277,10 +277,14 @@ class StrideViewModel(private val container: AppContainer) : ViewModel() {
     suspend fun exportCsv(): String = Export.stepsCsv(stepRepository.allDays())
 
     suspend fun exportJson(): String =
-        Export.json(stepRepository.allDays(), routeRepository.routes(), routeRepository.allPoints())
+        Export.json(
+            stepRepository.allDays(),
+            routeRepository.routeSummaries(),
+            routeRepository.allPoints()
+        )
 
     suspend fun exportGpx(routeId: Long): String {
-        val route = routeRepository.routes().firstOrNull { it.id == routeId }
+        val route = routeRepository.routeSummaries().firstOrNull { it.id == routeId }
             ?: return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<gpx version=\"1.1\" creator=\"Stride\"/>\n"
         return Export.gpx(route, routeRepository.points(routeId))
     }
